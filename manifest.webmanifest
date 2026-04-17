@@ -2,20 +2,20 @@
   "name": "Anker Champions League",
   "short_name": "Anker CL",
   "description": "Track results, standings, scorers, and head-to-head stats for the Anker Champions League.",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0a0a0f",
   "theme_color": "#0a0a0f",
   "icons": [
     {
-      "src": "icons/icon-192.svg",
+      "src": "/icon-192.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-512.svg",
+      "src": "/icon-512.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"

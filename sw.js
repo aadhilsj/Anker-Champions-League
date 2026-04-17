@@ -1,11 +1,11 @@
 const CACHE_VERSION='acl-pwa-v1';
 const APP_SHELL=[
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './icons/icon.svg',
-  './icons/icon-192.svg',
-  './icons/icon-512.svg'
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/icon.svg',
+  '/icon-192.svg',
+  '/icon-512.svg'
 ];
 
 self.addEventListener('install',event=>{
@@ -41,7 +41,7 @@ self.addEventListener('fetch',event=>{
 
   if(request.mode==='navigate'){
     event.respondWith(
-      fetch(request).catch(()=>caches.match('./index.html'))
+      fetch(request).catch(()=>caches.match('/index.html'))
     );
     return;
   }
@@ -62,8 +62,7 @@ async function cacheFirst(request){
 
 async function networkFirst(request){
   try{
-    const response=await fetch(request);
-    return response;
+    return await fetch(request);
   }catch(error){
     const cached=await caches.match(request);
     if(cached)return cached;

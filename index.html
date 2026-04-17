@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anker Champions League</title>
+<meta name="theme-color" content="#0a0a0f">
+<meta name="description" content="Track results, standings, scorers, and head-to-head stats for the Anker Champions League.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Anker CL">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.svg">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -252,6 +260,12 @@
   /* ── COMPACT TOPBAR BUTTONS ── */
   .topbar-action{background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11px;padding:4px 9px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
   .topbar-action:hover{border-color:var(--green);color:var(--green);}
+  .topbar-action.install-ready{border-color:rgba(0,255,135,0.35);color:var(--green);}
+  .topbar-action[hidden]{display:none!important;}
+  .pwa-banner{display:none;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(135deg,rgba(0,255,135,0.08),rgba(78,168,222,0.08));border:1px solid rgba(0,255,135,0.16);border-radius:14px;padding:12px 14px;margin-bottom:18px;}
+  .pwa-banner.visible{display:flex;}
+  .pwa-banner-copy strong{display:block;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--green);margin-bottom:3px;}
+  .pwa-banner-copy span{display:block;font-size:13px;color:var(--text);}
 
   /* ── VALIDATION WARNING ── */
   .validation-warn{background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--gold);margin-top:10px;display:none;}
@@ -531,10 +545,18 @@
     <button class="bottom-nav-btn" id="bnav-history" onclick="switchTab('history')"><span class="nav-icon">📋</span>History</button>
     <button class="bottom-nav-btn" id="bnav-scorers" onclick="switchTab('scorers')"><span class="nav-icon">⚽</span>Scorers</button>
   </nav>
+  <div class="pwa-banner" id="pwa-banner">
+    <div class="pwa-banner-copy">
+      <strong>Install App</strong>
+      <span>Save this tracker to your home screen for a full-screen, offline-friendly version.</span>
+    </div>
+    <button class="btn sm" id="install-banner-btn" type="button">Install</button>
+  </div>
   <div class="top-bar">
     <div class="top-bar-name" id="session-label"></div>
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
       <span id="sync-status" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);"></span>
+      <button class="topbar-action" id="install-app-btn" type="button" hidden>Install app</button>
       <button class="topbar-action" onclick="showDataPanel()">⬇ Export</button>
       <button class="topbar-action" onclick="showImportPanel()">⬆ Import</button>
       <button class="topbar-action" onclick="resetSession()">Reset</button>
@@ -749,6 +771,28 @@ let currentMatchType='normal', editMatchType='normal', editingMatchId=null;
 let mgrSort={col:'goals', dir:'desc'};
 let plyrSort={col:'goals', dir:'desc'};
 let plyrView='overview'; // 'overview' | 'types'
+let deferredInstallPrompt=null;
+
+function updateInstallUi(){
+  const installBtn=document.getElementById('install-app-btn');
+  const installBanner=document.getElementById('pwa-banner');
+  const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  const canInstall=!!deferredInstallPrompt&&!isStandalone;
+  if(installBtn){
+    installBtn.hidden=!canInstall;
+    installBtn.classList.toggle('install-ready',canInstall);
+  }
+  if(installBanner)installBanner.classList.toggle('visible',canInstall);
+}
+
+async function promptInstall(){
+  if(!deferredInstallPrompt)return;
+  const promptEvent=deferredInstallPrompt;
+  deferredInstallPrompt=null;
+  updateInstallUi();
+  await promptEvent.prompt();
+  await promptEvent.userChoice;
+}
 
 function setPlyrView(view){
   plyrView=view;
@@ -1962,6 +2006,31 @@ document.getElementById('confirm-delete-btn').addEventListener('click',function(
 });
 document.getElementById('confirm-cancel-btn').addEventListener('click',hideConfirm);
 document.getElementById('confirm-overlay').addEventListener('click',function(e){if(e.target===this)hideConfirm();});
+
+document.getElementById('install-app-btn').addEventListener('click',promptInstall);
+document.getElementById('install-banner-btn').addEventListener('click',promptInstall);
+
+window.addEventListener('beforeinstallprompt',event=>{
+  event.preventDefault();
+  deferredInstallPrompt=event;
+  updateInstallUi();
+});
+
+window.addEventListener('appinstalled',()=>{
+  deferredInstallPrompt=null;
+  updateInstallUi();
+  setSyncStatus('App installed ✓','var(--green)');
+});
+
+window.addEventListener('DOMContentLoaded',updateInstallUi);
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./service-worker.js').catch(err=>{
+      console.error('Service worker registration failed',err);
+    });
+  });
+}
 </script>
 </body>
 </html>

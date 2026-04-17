@@ -822,10 +822,61 @@ const HARDCODED_BIN_ID='69d87cca36566621a898f51e';
 let binId=HARDCODED_BIN_ID;
 localStorage.setItem(LS_BIN_KEY, HARDCODED_BIN_ID);
 let syncTimeout=null;
+let currentDataUpdatedAt=0;
 
 function setSyncStatus(msg, colour='var(--muted)'){
   const el=document.getElementById('sync-status');
   if(el){el.textContent=msg;el.style.color=colour;}
+}
+
+function getLegacySeriesBaseline(name){
+  const n=(name||'').toLowerCase();
+  return (n.includes('james')||n.includes('aadhil')||n.includes('ardil')) ? 1 : 0;
+}
+
+function getMatchWinnerIdx(m){
+  if(!m)return null;
+  return matchResult(m,m.home)==='W' ? m.home : matchResult(m,m.away)==='W' ? m.away : null;
+}
+
+function recomputeSeriesWins(){
+  const totals=players.map(p=>getLegacySeriesBaseline(p.name));
+  matches.forEach(m=>{
+    if(!m.seriesClinch)return;
+    const winnerIdx=getMatchWinnerIdx(m);
+    if(winnerIdx!==null&&totals[winnerIdx]!==undefined)totals[winnerIdx]+=1;
+  });
+  players=players.map((p,i)=>({...p,seriesWins:totals[i]||0}));
+}
+
+function normaliseData(raw){
+  const d=raw||{};
+  const nextMatches=(d.matches||[]).map(m=>({
+    ...m,
+    seriesClinch:!!m.seriesClinch
+  }));
+  let nextPlayers=[];
+  if(Array.isArray(d.players)&&d.players.length===3){
+    if(typeof d.players[0]==='string'){
+      nextPlayers=d.players.map(name=>({name,team:'',seriesWins:getLegacySeriesBaseline(name)}));
+    } else {
+      nextPlayers=d.players.map(p=>({
+        ...p,
+        team:p.team||'',
+        seriesWins:typeof p.seriesWins==='number' ? p.seriesWins : getLegacySeriesBaseline(p.name)
+      }));
+    }
+  }
+  return {
+    players:nextPlayers,
+    matches:nextMatches,
+    updatedAt:Number(d.updatedAt)||0
+  };
+}
+
+function getDataSnapshot(){
+  recomputeSeriesWins();
+  return {players,matches,updatedAt:currentDataUpdatedAt||Date.now()};
 }
 
 async function cloudSave(data){
@@ -851,9 +902,10 @@ async function cloudLoad(){
   setSyncStatus('Loading…');
   // Try local cache first for instant load
   const cached=localStorage.getItem(LS_CACHE);
+  let cachedData=null;
   if(cached){
-    const d=JSON.parse(cached);
-    applyData(d);
+    cachedData=normaliseData(JSON.parse(cached));
+    applyData(cachedData);
   }
   // If we have a bin ID, fetch fresh data from cloud
   if(binId){
@@ -863,10 +915,16 @@ async function cloudLoad(){
       });
       const json=await res.json();
       if(json.record){
-        applyData(json.record);
-        localStorage.setItem(LS_CACHE,JSON.stringify(json.record));
-        setSyncStatus('Synced ✓','var(--green)');
-        return 'synced';
+        const remoteData=normaliseData(json.record);
+        if(remoteData.updatedAt>=currentDataUpdatedAt){
+          applyData(remoteData);
+          localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
+          setSyncStatus('Synced ✓','var(--green)');
+          return 'synced';
+        }
+        setSyncStatus('Local changes kept','var(--gold)');
+        cloudSave(getDataSnapshot());
+        return cachedData ? 'cached' : 'empty';
       }
     } catch(e){
       setSyncStatus('Offline — using cached data','var(--gold)');
@@ -878,14 +936,12 @@ async function cloudLoad(){
 }
 
 function applyData(d){
-  matches=d.matches||[];
-  if(!d.players||d.players.length!==3) return;
-  if(typeof d.players[0]==='string'){
-    players=d.players.map(name=>({name,team:'',seriesWins:0}));
-  } else {
-    // Backfill seriesWins if missing
-    players=d.players.map(p=>({...p,seriesWins:p.seriesWins||0}));
-  }
+  const data=normaliseData(d);
+  matches=data.matches;
+  if(!data.players||data.players.length!==3) return;
+  players=data.players;
+  currentDataUpdatedAt=data.updatedAt||Date.now();
+  recomputeSeriesWins();
 }
 
 /* ── STORAGE ── */
@@ -899,21 +955,31 @@ function loadData(){
   }
   const cached=localStorage.getItem(LS_CACHE);
   if(!cached)return false;
-  const d=JSON.parse(cached);
+  const d=normaliseData(JSON.parse(cached));
   matches=d.matches||[];
+  currentDataUpdatedAt=d.updatedAt||Date.now();
   if(!d.players||d.players.length!==3)return false;
-  if(typeof d.players[0]==='string'){players=d.players.map(name=>({name,team:''}));return 'noteams';}
+  if(typeof JSON.parse(cached).players?.[0]==='string'){players=d.players.map(p=>({...p,team:''}));recomputeSeriesWins();return 'noteams';}
   players=d.players;
+  recomputeSeriesWins();
   return true;
 }
 
 function saveData(){
-  const data={players,matches};
+  currentDataUpdatedAt=Date.now();
+  const data=getDataSnapshot();
   // Always write to local cache immediately
   localStorage.setItem(LS_CACHE,JSON.stringify(data));
   // Debounce cloud save by 1.5s to avoid hammering on rapid changes
   clearTimeout(syncTimeout);
   syncTimeout=setTimeout(()=>cloudSave(data),1500);
+}
+
+function flushCloudSave(){
+  clearTimeout(syncTimeout);
+  const cached=localStorage.getItem(LS_CACHE);
+  if(!cached)return;
+  cloudSave(normaliseData(JSON.parse(cached)));
 }
 
 /* ── TEAM COLOURS ── */
@@ -1380,15 +1446,6 @@ function logGame(){
   const dnps=collectDNPs(dnpLog,hi,ai);
   const seriesClinch=document.getElementById('series-clinch-toggle').checked;
 
-  // Determine winner for series win
-  if(seriesClinch){
-    const winnerIdx=matchResult({home:hi,away:ai,hg,ag,matchType:currentMatchType,penWinner},hi)==='W'?hi:
-                    matchResult({home:hi,away:ai,hg,ag,matchType:currentMatchType,penWinner},ai)==='W'?ai:null;
-    if(winnerIdx!==null){
-      players[winnerIdx].seriesWins=(players[winnerIdx].seriesWins||0)+1;
-    }
-  }
-
   matches.push({id:Date.now(),
     date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),
     dateISO:new Date().toISOString().slice(0,10),
@@ -1465,16 +1522,6 @@ function saveEdit(){
   const idx=matches.findIndex(x=>String(x.id)===String(editingMatchId));
   if(idx===-1)return;
   const oldMatch=matches[idx];
-  // Handle series win delta — if clinch status changed, adjust player series wins
-  const oldClinch=!!(oldMatch.seriesClinch);
-  if(oldClinch!==newSeriesClinch){
-    const winnerIdx=matchResult({home:hi,away:ai,hg,ag,matchType:editMatchType,penWinner},hi)==='W'?hi:
-                    matchResult({home:hi,away:ai,hg,ag,matchType:editMatchType,penWinner},ai)==='W'?ai:null;
-    if(winnerIdx!==null){
-      if(newSeriesClinch) players[winnerIdx].seriesWins=(players[winnerIdx].seriesWins||0)+1;
-      else players[winnerIdx].seriesWins=Math.max(0,(players[winnerIdx].seriesWins||0)-1);
-    }
-  }
   matches[idx]={...oldMatch,home:hi,away:ai,hg,ag,matchType:editMatchType,penWinner,scorers,dnps,seriesClinch:newSeriesClinch};
   saveData();closeEditModal();renderHistory();
 }
@@ -1510,6 +1557,7 @@ function getStats(subset){
 
 /* ── RENDER STANDINGS ── */
 function renderStandings(){
+  recomputeSeriesWins();
   const stats=getStats();
   const grid=document.getElementById('standings-grid');grid.innerHTML='';
   stats.forEach((s,rank)=>{
@@ -1956,15 +2004,10 @@ function backfillDates(){
   if(changed)saveData();
 }
 
-// Hard-set offline series wins: James = 1, Aadhil = 1
-// Runs once, overwrites whatever is stored
+// Legacy baseline before series-clinch tracking existed
 function backfillSeriesWins(){
   if(localStorage.getItem('anker_series_backfilled_v2'))return;
-  players.forEach(p=>{
-    const n=p.name.toLowerCase();
-    if(n.includes('james')) p.seriesWins=1;
-    if(n.includes('aadhil')) p.seriesWins=1;
-  });
+  recomputeSeriesWins();
   saveData();
   localStorage.setItem('anker_series_backfilled_v2','1');
   // Clear old flag too
@@ -2021,6 +2064,12 @@ window.addEventListener('appinstalled',()=>{
   updateInstallUi();
   setSyncStatus('App installed ✓','var(--green)');
 });
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden')flushCloudSave();
+});
+
+window.addEventListener('beforeunload',flushCloudSave);
 
 window.addEventListener('DOMContentLoaded',updateInstallUi);
 

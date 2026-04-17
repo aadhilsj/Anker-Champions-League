@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f1118"/>
+      <stop offset="100%" stop-color="#08090d"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00ff87"/>
+      <stop offset="100%" stop-color="#4EA8DE"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#bg)"/>
+  <path d="M96 34l42 24v48l-42 24-42-24V58l42-24z" fill="none" stroke="url(#accent)" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M96 53l24 14v28l-24 14-24-14V67l24-14z" fill="#111118" stroke="#ffffff" stroke-opacity=".18" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M56 138h80" stroke="url(#accent)" stroke-width="7" stroke-linecap="round"/>
+  <text x="96" y="165" fill="#e8e8f0" font-family="Arial, sans-serif" font-size="28" font-weight="700" text-anchor="middle">ACL</text>
+</svg>

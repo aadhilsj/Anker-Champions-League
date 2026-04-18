@@ -642,7 +642,9 @@
         <button class="add-scorer-btn" onclick="addScorerRow()">+ Add scorer / assister</button>
       </div>
 
-      <button class="btn" onclick="logGame()" style="margin-top:20px">LOG RESULT</button>
+      <div style="margin-top:28px;border-top:1px solid var(--border);padding-top:24px;">
+        <button class="btn" id="log-result-btn" onclick="logGame()" style="margin-top:0;background:var(--surface3);color:var(--muted);border:1px solid var(--border);transition:background 0.25s,color 0.25s,border-color 0.25s,box-shadow 0.25s;">LOG RESULT</button>
+      </div>
     </div>
   </div>
 
@@ -1089,7 +1091,6 @@ function makeAutocomplete(input){
 /* ── SCORER ROWS (log form) ── */
 function addScorerRow(name='',team='',goals=0,headers=0,fk=0,ls=0,pen=0,assists=0){
   const id=Date.now()+Math.random();scorerRowIds.push(id);
-  // Only show the two teams currently playing
   const hiRaw=document.getElementById('home-player').value;
   const aiRaw=document.getElementById('away-player').value;
   const hi=hiRaw!==''?parseInt(hiRaw):0;
@@ -1353,6 +1354,7 @@ function logGame(){
   document.getElementById('pen-winner').value='';
   document.getElementById('series-clinch-toggle').checked=false;
   refreshDNPLog();
+  updateLogBtn();
   switchTab('standings');
 }
 
@@ -1938,8 +1940,45 @@ function backfillSeriesWins(){
   }
 })();
 
-// Close modal on overlay click
-document.getElementById('edit-modal').addEventListener('click',function(e){if(e.target===this)closeEditModal();});
+/* ── LOG RESULT BUTTON STATE ── */
+function updateLogBtn(){
+  const btn=document.getElementById('log-result-btn');
+  if(!btn)return;
+  const hg=parseInt(document.getElementById('home-score')?.value)||0;
+  const ag=parseInt(document.getElementById('away-score')?.value)||0;
+  const hasScorers=document.querySelectorAll('#scorers-list .scorer-row').length>0;
+  const ready=hg>0||ag>0||hasScorers;
+  if(ready){
+    btn.style.background='var(--green)';
+    btn.style.color='#000';
+    btn.style.borderColor='var(--green)';
+    btn.style.boxShadow='0 4px 16px rgba(0,255,135,0.25)';
+  } else {
+    btn.style.background='var(--surface3)';
+    btn.style.color='var(--muted)';
+    btn.style.borderColor='var(--border)';
+    btn.style.boxShadow='none';
+  }
+}
+
+// Watch score inputs
+document.addEventListener('input', function(e){
+  if(e.target.id==='home-score'||e.target.id==='away-score') updateLogBtn();
+});
+// Watch scorer rows being added/removed (MutationObserver)
+const scorerListObserver=new MutationObserver(updateLogBtn);
+document.addEventListener('DOMContentLoaded',()=>{
+  const sl=document.getElementById('scorers-list');
+  if(sl) scorerListObserver.observe(sl,{childList:true});
+});
+// Also call after launchApp since DOMContentLoaded may have already fired
+const _origLaunchApp=launchApp;
+launchApp=function(){
+  _origLaunchApp();
+  updateLogBtn();
+  const sl=document.getElementById('scorers-list');
+  if(sl) scorerListObserver.observe(sl,{childList:true});
+};
 
 // Confirm delete dialog
 document.getElementById('confirm-delete-btn').addEventListener('click',function(){

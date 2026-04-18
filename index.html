@@ -713,7 +713,7 @@
       <table class="monthly-detail-table">
         <thead><tr>
           <th>Player</th><th>Team</th><th style="color:var(--green)">W</th>
-          <th>D</th><th style="color:var(--red)">L</th><th>Played</th>
+          <th style="color:var(--red)">L</th><th>Played</th>
           <th>Win %</th><th>GF</th><th>GA</th><th style="color:var(--blue)">CS</th>
         </tr></thead>
         <tbody id="monthly-tbody"></tbody>
@@ -1487,11 +1487,11 @@ function getStats(subset){
   return players.map((p,i)=>{
     const pl=ms.filter(m=>m.home===i||m.away===i);
     const wins=pl.filter(m=>matchResult(m,i)==='W').length;
-    const draws=pl.filter(m=>matchResult(m,i)==='D').length;
+    const draws=0;
     const losses=pl.filter(m=>matchResult(m,i)==='L').length;
     const gf=pl.reduce((s,m)=>s+(m.home===i?m.hg:m.ag),0);
     const ga=pl.reduce((s,m)=>s+(m.home===i?m.ag:m.hg),0);
-    return{name:p.name,team:p.team,idx:i,played:pl.length,wins,draws,losses,gf,ga,gd:gf-ga,pts:wins*3+draws,cs:getCleanSheets(i,ms),streak:getWinStreak(i)};
+    return{name:p.name,team:p.team,idx:i,played:pl.length,wins,draws,losses,gf,ga,gd:gf-ga,pts:wins*3,cs:getCleanSheets(i,ms),streak:getWinStreak(i)};
   }).sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
 }
 
@@ -1518,13 +1518,13 @@ function renderStandings(){
           <div class="pts-label">Points</div>
         </div>
         <div class="stat-row"><span class="stat-label">Played</span><span class="stat-value">${s.played}</span></div>
-        <div class="stat-row"><span class="stat-label">W / D / L</span><span class="stat-value"><span class="green">${s.wins}</span> / ${s.draws} / <span class="red">${s.losses}</span></span></div>
+        <div class="stat-row"><span class="stat-label">W / L</span><span class="stat-value"><span class="green">${s.wins}</span> / <span class="red">${s.losses}</span></span></div>
         <div class="stat-row"><span class="stat-label">Goals For</span><span class="stat-value">${s.gf}</span></div>
         <div class="stat-row"><span class="stat-label">Goals Against</span><span class="stat-value">${s.ga}</span></div>
         <div class="stat-row"><span class="stat-label">Goal Diff</span><span class="stat-value ${s.gd>=0?'green':'red'}">${s.gd>=0?'+':''}${s.gd}</span></div>
         <div class="stat-row"><span class="stat-label">Clean Sheets</span><span class="stat-value blue">${s.cs}</span></div>
         <div class="stat-row"><span class="stat-label">Win %</span><span class="stat-value">${s.played>0?Math.round((s.wins/s.played)*100)+'%':'—'}</span></div>
-        <div class="stat-row"><span class="stat-label">Series Wins</span><span class="stat-value gold">${getSeriesWins(s.idx)}</span></div>
+        <div class="stat-row"><span class="stat-label">Series Wins</span><span class="stat-value">${getSeriesWins(s.idx)}</span></div>
         <div class="stat-row"><span class="stat-label">Months Won</span><span class="stat-value gold">${monthsWon[s.idx]}</span></div>
       </div>`;
   });
@@ -1568,10 +1568,6 @@ function renderStandings(){
             <span class="slim-chip-val" style="color:var(--green)">${s.wins}</span>
           </div>
           <div class="slim-wdl-chip">
-            <span class="slim-chip-label">D</span>
-            <span class="slim-chip-val">${s.draws}</span>
-          </div>
-          <div class="slim-wdl-chip">
             <span class="slim-chip-label">L</span>
             <span class="slim-chip-val" style="color:var(--red)">${s.losses}</span>
           </div>
@@ -1602,9 +1598,9 @@ function renderStandings(){
             <span class="slim-chip-label">Win %</span>
             <span class="slim-chip-val">${winPct}</span>
           </div>
-          <div class="slim-chip gold-chip">
+          <div class="slim-chip">
             <span class="slim-chip-label">Series W</span>
-            <span class="slim-chip-val" style="color:var(--gold)">${getSeriesWins(s.idx)}</span>
+            <span class="slim-chip-val">${getSeriesWins(s.idx)}</span>
           </div>
           <div class="slim-chip gold-chip">
             <span class="slim-chip-label">Months W</span>
@@ -1670,14 +1666,13 @@ function renderMonthly(){
   // Detail table
   const tbody=document.getElementById('monthly-tbody');
   if(!subset.length){
-    tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:28px">No games in this period</td></tr>`;return;
+    tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:28px">No games in this period</td></tr>`;return;
   }
   tbody.innerHTML=stats.map(s=>`
     <tr>
       <td style="font-weight:500">${s.name}</td>
       <td>${teamPill(s.team)}</td>
       <td><span class="num" style="color:var(--green)">${s.wins}</span></td>
-      <td><span class="num">${s.draws}</span></td>
       <td><span class="num" style="color:var(--red)">${s.losses}</span></td>
       <td><span class="num">${s.played}</span></td>
       <td><span class="num">${s.played>0?Math.round((s.wins/s.played)*100)+'%':'—'}</span></td>
@@ -1696,7 +1691,6 @@ function renderH2H(){
     const shared=matches.filter(m=>(m.home===a&&m.away===b)||(m.home===b&&m.away===a));
     const aW=shared.filter(m=>matchResult(m,a)==='W').length;
     const bW=shared.filter(m=>matchResult(m,b)==='W').length;
-    const dr=shared.filter(m=>matchResult(m,a)==='D').length;
     const aGf=shared.reduce((s,m)=>s+(m.home===a?m.hg:m.ag),0);
     const bGf=shared.reduce((s,m)=>s+(m.home===b?m.hg:m.ag),0);
     const total=shared.length;
@@ -1706,7 +1700,7 @@ function renderH2H(){
         <div class="h2h-title">${players[a].name} vs ${players[b].name}</div>
         <div class="h2h-names-row">
           <div><div class="h2h-pname">${players[a].name}</div><div class="h2h-psub" style="${teamColourStyle(players[a].team)}">${players[a].team||'—'}</div></div>
-          <div class="h2h-score">${aW}<span style="color:var(--muted);font-size:18px">-${dr}-</span>${bW}</div>
+          <div class="h2h-score">${aW}<span style="color:var(--muted);font-size:18px"> — </span>${bW}</div>
           <div style="text-align:right"><div class="h2h-pname">${players[b].name}</div><div class="h2h-psub" style="text-align:right;${teamColourStyle(players[b].team)}">${players[b].team||'—'}</div></div>
         </div>
         <div class="h2h-bar"><div class="h2h-bar-fill" style="width:${aBarPct}%"></div></div>

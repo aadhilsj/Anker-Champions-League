@@ -185,6 +185,25 @@
   .match-action-btn:hover{color:var(--green);}
   .match-action-btn.del:hover{color:var(--red);}
   .match-scorers-row{font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+  /* Collapsible scorers */
+  .match-scorers-body{display:none;}
+  .match-scorers-body.open{display:block;}
+  .scorers-toggle-btn{background:transparent;border:none;color:var(--muted);font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);width:100%;transition:color 0.2s;}
+  .scorers-toggle-btn:hover{color:var(--green);}
+  /* Compact standings table on mobile */
+  .standings-compact{display:none;}
+  .standings-compact-table{width:100%;border-collapse:collapse;}
+  .standings-compact-table th{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+  .standings-compact-table th:not(:first-child){text-align:center;}
+  .standings-compact-table td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;vertical-align:middle;}
+  .standings-compact-table td:not(:first-child){text-align:center;}
+  .standings-compact-table tr:last-child td{border-bottom:none;}
+  .standings-compact-table tr:hover td{background:rgba(255,255,255,0.02);}
+  .sct-name{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:0.5px;}
+  .sct-team{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:1px;}
+  .sct-pts{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);}
+  .sct-rank{font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--muted);width:20px;}
+  .player-detail-cards{margin-top:16px;}
 
   /* EDIT MODAL */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
@@ -253,6 +272,10 @@
   .topbar-action{background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11px;padding:4px 9px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
   .topbar-action:hover{border-color:var(--green);color:var(--green);}
 
+  /* ── SMART LOG RESULT BUTTON ── */
+  .btn-log-result{background:var(--surface3);color:var(--muted);border:1px solid var(--border);box-shadow:none;transition:background 0.25s,color 0.25s,border-color 0.25s,box-shadow 0.25s;}
+  .btn-log-result.active{background:var(--green);color:#000;border-color:var(--green);box-shadow:0 0 20px rgba(0,255,135,0.35);}
+
   /* ── VALIDATION WARNING ── */
   .validation-warn{background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--gold);margin-top:10px;display:none;}
   .validation-warn.show{display:block;}
@@ -302,10 +325,13 @@
       display:flex;
       position:fixed;
       bottom:0;left:0;right:0;
-      background:var(--surface);
-      border-top:1px solid var(--border);
+      background:rgba(17,17,24,0.92);
+      backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(16px);
+      border-top:1px solid rgba(255,255,255,0.06);
       z-index:150;
       padding:0;
+      padding-bottom:env(safe-area-inset-bottom);
     }
     .bottom-nav-btn{
       flex:1;
@@ -316,6 +342,7 @@
       padding:10px 4px 14px;
       background:transparent;
       border:none;
+      border-top:2px solid transparent;
       color:var(--muted);
       font-family:'DM Sans',sans-serif;
       font-size:9px;
@@ -323,12 +350,13 @@
       text-transform:uppercase;
       cursor:pointer;
       gap:4px;
-      transition:color 0.2s;
+      transition:color 0.2s, border-color 0.2s;
       -webkit-tap-highlight-color:transparent;
     }
-    .bottom-nav-btn .nav-icon{font-size:18px;line-height:1;}
-    .bottom-nav-btn.active{color:var(--green);}
-    .bottom-nav-btn:active{opacity:0.7;}
+    .bottom-nav-btn .nav-icon{font-size:18px;line-height:1;transition:transform 0.2s;}
+    .bottom-nav-btn.active{color:var(--green);border-top-color:var(--green);}
+    .bottom-nav-btn.active .nav-icon{transform:translateY(-1px) scale(1.1);}
+    .bottom-nav-btn:active{opacity:0.6;}
 
     /* Cards */
     .log-card{padding:16px 14px;border-radius:12px;}
@@ -362,9 +390,9 @@
     .score-inputs input{font-size:22px;padding:10px;}
 
     /* Standings */
-    .standings-grid{grid-template-columns:1fr;gap:12px;}
-    .pts-big{font-size:38px;}
-    .player-name-big{font-size:20px;}
+    .standings-grid{display:none;}
+    .standings-compact{display:block;}
+    .player-detail-cards .player-card{margin-bottom:12px;}
 
     /* Match items */
     .match-main{grid-template-columns:1fr auto auto auto;gap:8px;}
@@ -525,11 +553,10 @@
   <!-- MOBILE BOTTOM NAV -->
   <nav class="bottom-nav">
     <button class="bottom-nav-btn active" id="bnav-standings" onclick="switchTab('standings')"><span class="nav-icon">🏆</span>All Time</button>
-    <button class="bottom-nav-btn" id="bnav-log" onclick="switchTab('log')"><span class="nav-icon">➕</span>Log</button>
     <button class="bottom-nav-btn" id="bnav-monthly" onclick="switchTab('monthly')"><span class="nav-icon">📅</span>Monthly</button>
     <button class="bottom-nav-btn" id="bnav-h2h" onclick="switchTab('h2h')"><span class="nav-icon">⚔️</span>H2H</button>
-    <button class="bottom-nav-btn" id="bnav-history" onclick="switchTab('history')"><span class="nav-icon">📋</span>History</button>
     <button class="bottom-nav-btn" id="bnav-scorers" onclick="switchTab('scorers')"><span class="nav-icon">⚽</span>Scorers</button>
+    <button class="bottom-nav-btn" id="bnav-history" onclick="switchTab('history')"><span class="nav-icon">📋</span>History</button>
   </nav>
   <div class="top-bar">
     <div class="top-bar-name" id="session-label"></div>
@@ -572,8 +599,8 @@
     <button class="tab-btn" onclick="switchTab('log')">Log Game</button>
     <button class="tab-btn" onclick="switchTab('monthly')">Monthly</button>
     <button class="tab-btn" onclick="switchTab('h2h')">H2H</button>
-    <button class="tab-btn" onclick="switchTab('history')">History</button>
     <button class="tab-btn" onclick="switchTab('scorers')">Scorers</button>
+    <button class="tab-btn" onclick="switchTab('history')">History</button>
   </div>
 
   <!-- FLOATING ACTION BUTTON -->
@@ -582,7 +609,29 @@
   </button>
 
   <!-- STANDINGS -->
-  <div id="tab-standings"><div class="standings-grid" id="standings-grid"></div></div>
+  <div id="tab-standings">
+    <!-- Mobile compact table -->
+    <div class="standings-compact">
+      <div class="log-card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+        <table class="standings-compact-table" id="standings-compact-table">
+          <thead><tr>
+            <th style="width:20px"></th>
+            <th>Player</th>
+            <th>Pts</th>
+            <th>W</th>
+            <th>D</th>
+            <th>L</th>
+            <th>GD</th>
+            <th>CS</th>
+          </tr></thead>
+          <tbody id="standings-compact-tbody"></tbody>
+        </table>
+      </div>
+      <div class="player-detail-cards" id="standings-detail-cards"></div>
+    </div>
+    <!-- Desktop grid -->
+    <div class="standings-grid" id="standings-grid"></div>
+  </div>
 
   <!-- LOG GAME -->
   <div id="tab-log" style="display:none">
@@ -642,8 +691,8 @@
         <button class="add-scorer-btn" onclick="addScorerRow()">+ Add scorer / assister</button>
       </div>
 
-      <div style="margin-top:28px;border-top:1px solid var(--border);padding-top:24px;">
-        <button class="btn" id="log-result-btn" onclick="logGame()" style="margin-top:0;background:var(--surface3);color:var(--muted);border:1px solid var(--border);transition:background 0.25s,color 0.25s,border-color 0.25s,box-shadow 0.25s;">LOG RESULT</button>
+      <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
+        <button class="btn btn-log-result" id="log-result-btn" onclick="logGame()">LOG RESULT</button>
       </div>
     </div>
   </div>
@@ -928,7 +977,6 @@ function launchApp(){
   document.getElementById('app-screen').style.display='block';
   document.getElementById('session-label').textContent=players.map(p=>p.name).join(' · ');
   populateSelects();
-  refreshDNPLog();
   // Populate team filter
   const tf=document.getElementById('plyr-team-filter');
   tf.innerHTML='<option value="">All Teams</option>'+
@@ -987,6 +1035,16 @@ function resetSession(){
   location.reload();
 }
 
+/* ── SMART LOG BUTTON ── */
+function updateLogBtn(){
+  const hg=parseInt(document.getElementById('home-score')?.value)||0;
+  const ag=parseInt(document.getElementById('away-score')?.value)||0;
+  const hasScorers=document.querySelectorAll('#scorers-list .scorer-row').length>0;
+  const active=hg>0||ag>0||hasScorers;
+  const btn=document.getElementById('log-result-btn');
+  if(btn)btn.classList.toggle('active',active);
+}
+
 /* ── SELECTS ── */
 function populateSelects(){
   const opts=players.map((p,i)=>`<option value="${i}">${p.name} — ${p.team||'?'}</option>`).join('');
@@ -997,35 +1055,34 @@ function populateSelects(){
   const pwOpts=`<option value="">— Select winner —</option>`+players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join('');
   document.getElementById('pen-winner').innerHTML=pwOpts;
   document.getElementById('edit-pen-winner').innerHTML=pwOpts;
-  refreshDNPLog();
 }
 
 function refreshDNPLog(){
-  const hiRaw=document.getElementById('home-player').value;
-  const aiRaw=document.getElementById('away-player').value;
-  const hi=hiRaw!==''?parseInt(hiRaw):0;
-  const ai=aiRaw!==''?parseInt(aiRaw):1;
+  const hi=parseInt(document.getElementById('home-player').value)||0;
+  const ai=parseInt(document.getElementById('away-player').value)||1;
   buildDNPPanel('dnp-teams-log', dnpLog, hi, ai);
 }
 
-// Rebuild DNP log panel and scorer team dropdowns when players change
+// Rebuild scorer team dropdowns when players change
 document.addEventListener('change', function(e){
+  if(e.target.id==='home-score'||e.target.id==='away-score') updateLogBtn();
   if(e.target.id==='home-player'||e.target.id==='away-player'){
-    dnpLog={home:new Set(),away:new Set()};
-    refreshDNPLog();
     // Refresh team options in any existing scorer rows
-    const hiRaw=document.getElementById('home-player').value;
-    const aiRaw=document.getElementById('away-player').value;
-    const hi=hiRaw!==''?parseInt(hiRaw):0;
-    const ai=aiRaw!==''?parseInt(aiRaw):1;
+    const hi=parseInt(document.getElementById('home-player').value);
+    const ai=parseInt(document.getElementById('away-player').value);
     const matchTeams=[players[hi],players[ai]].filter(Boolean);
     const newOpts=`<option value="">— Team —</option>`+matchTeams.map(p=>`<option value="${p.team||p.name}">${p.team||p.name}</option>`).join('');
     document.querySelectorAll('#scorers-list .scorer-team').forEach(sel=>{
       const cur=sel.value;
       sel.innerHTML=newOpts;
-      sel.value=cur; // try to restore, will be empty if team no longer in match
+      sel.value=cur;
     });
   }
+});
+
+// Score input live update for log button
+document.addEventListener('input', function(e){
+  if(e.target.id==='home-score'||e.target.id==='away-score') updateLogBtn();
 });
 
 /* ── TABS ── */
@@ -1033,11 +1090,12 @@ function switchTab(tab){
   ['standings','log','monthly','h2h','history','scorers'].forEach(t=>{
     document.getElementById('tab-'+t).style.display=t===tab?'block':'none';
   });
+  // Desktop tab order: standings, log, monthly, h2h, scorers, history
   document.querySelectorAll('.tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active',['standings','log','monthly','h2h','history','scorers'][i]===tab);
+    b.classList.toggle('active',['standings','log','monthly','h2h','scorers','history'][i]===tab);
   });
-  // Sync bottom nav
-  ['standings','log','monthly','h2h','history','scorers'].forEach(t=>{
+  // Sync bottom nav (log has no bnav — uses FAB instead)
+  ['standings','monthly','h2h','scorers','history'].forEach(t=>{
     const btn=document.getElementById('bnav-'+t);
     if(btn)btn.classList.toggle('active',t===tab);
   });
@@ -1091,10 +1149,8 @@ function makeAutocomplete(input){
 /* ── SCORER ROWS (log form) ── */
 function addScorerRow(name='',team='',goals=0,headers=0,fk=0,ls=0,pen=0,assists=0){
   const id=Date.now()+Math.random();scorerRowIds.push(id);
-  const hiRaw=document.getElementById('home-player').value;
-  const aiRaw=document.getElementById('away-player').value;
-  const hi=hiRaw!==''?parseInt(hiRaw):0;
-  const ai=aiRaw!==''?parseInt(aiRaw):1;
+  const hi=parseInt(document.getElementById('home-player').value);
+  const ai=parseInt(document.getElementById('away-player').value);
   const matchTeams=[players[hi],players[ai]].filter(Boolean);
   const teamOpts=`<option value="">— Team —</option>`+matchTeams.map(p=>`<option value="${p.team||p.name}" ${(p.team||p.name)===team&&team?'selected':''}>${p.team||p.name}</option>`).join('');
   const div=document.createElement('div');div.className='scorer-row';div.id='srow-'+id;
@@ -1133,8 +1189,9 @@ function addScorerRow(name='',team='',goals=0,headers=0,fk=0,ls=0,pen=0,assists=
     <button class="goal-details-toggle" onclick="toggleGoalDetails('gdb-${id}',this)">🎯 Goal details ▼</button>`;
   document.getElementById('scorers-list').appendChild(div);
   makeAutocomplete(div.querySelector('.scorer-name'));
+  updateLogBtn();
 }
-function removeScorerRow(id){document.getElementById('srow-'+id)?.remove();scorerRowIds=scorerRowIds.filter(r=>r!==id);}
+function removeScorerRow(id){document.getElementById('srow-'+id)?.remove();scorerRowIds=scorerRowIds.filter(r=>r!==id);updateLogBtn();}
 
 /* ── SCORER ROWS (edit modal) ── */
 function addEditScorerRow(name='',team='',goals=0,headers=0,fk=0,ls=0,pen=0,assists=0){
@@ -1334,7 +1391,7 @@ function logGame(){
   logGame._warned=false;
   warnEl.classList.remove('show');
 
-  const dnps=collectDNPs(dnpLog,hi,ai);
+  const dnps=[];
   const seriesClinch=document.getElementById('series-clinch-toggle').checked;
 
   matches.push({id:Date.now(),
@@ -1349,11 +1406,9 @@ function logGame(){
   document.getElementById('away-score').value=0;
   document.getElementById('scorers-list').innerHTML='';
   scorerRowIds=[];
-  dnpLog={home:new Set(),away:new Set()};
   selectMatchType('normal');
   document.getElementById('pen-winner').value='';
   document.getElementById('series-clinch-toggle').checked=false;
-  refreshDNPLog();
   updateLogBtn();
   switchTab('standings');
 }
@@ -1434,14 +1489,6 @@ function getWinStreak(idx){
 function getCleanSheets(idx,subset){
   return (subset||matches).filter(m=>(m.home===idx&&m.ag===0)||(m.away===idx&&m.hg===0)).length;
 }
-
-const SERIES_BASE={'james':1,'aadhil':1};
-function getSeriesWins(idx){
-  const p=players[idx];
-  const base=SERIES_BASE[p?.name?.toLowerCase()?.trim()]||0;
-  const fromMatches=matches.filter(m=>m.seriesClinch&&matchResult(m,idx)==='W').length;
-  return base+fromMatches;
-}
 function getStats(subset){
   const ms=subset||matches;
   return players.map((p,i)=>{
@@ -1458,16 +1505,20 @@ function getStats(subset){
 /* ── RENDER STANDINGS ── */
 function renderStandings(){
   const stats=getStats();
+  const monthsWon=getMonthsWon();
+  const rankEmoji=['🥇','🥈','🥉'];
+  const fi=s=>s.played===0?'':s.wins>s.losses?'🔥':s.losses>s.wins?'❄️':'⚡';
+
+  // ── Desktop grid (unchanged) ──
   const grid=document.getElementById('standings-grid');grid.innerHTML='';
   stats.forEach((s,rank)=>{
     const rc=['rank-1','rank-2','rank-3'][rank]||'';
-    const fi=s.played===0?'':s.wins>s.losses?'🔥':s.losses>s.wins?'❄️':'⚡';
     const sc=s.streak;
     const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}">${sc.count}${sc.type}</span>`:'';
     grid.innerHTML+=`
       <div class="player-card ${rc}">
         <div class="rank-badge">${rank+1}</div>
-        <div class="player-name-big">${fi} ${s.name} ${sh}</div>
+        <div class="player-name-big">${fi(s)} ${s.name} ${sh}</div>
         <div class="player-team-sub" style="${teamColourStyle(s.team)}">${s.team||'—'}</div>
         <div style="margin-bottom:12px">
           <div class="pts-big" style="color:${rank===0?'var(--gold)':'var(--green)'}">${s.pts}</div>
@@ -1480,10 +1531,63 @@ function renderStandings(){
         <div class="stat-row"><span class="stat-label">Goal Diff</span><span class="stat-value ${s.gd>=0?'green':'red'}">${s.gd>=0?'+':''}${s.gd}</span></div>
         <div class="stat-row"><span class="stat-label">Clean Sheets</span><span class="stat-value blue">${s.cs}</span></div>
         <div class="stat-row"><span class="stat-label">Win %</span><span class="stat-value">${s.played>0?Math.round((s.wins/s.played)*100)+'%':'—'}</span></div>
-        <div class="stat-row"><span class="stat-label">🏆 Series Wins</span><span class="stat-value gold">${getSeriesWins(s.idx)}</span></div>
+        <div class="stat-row"><span class="stat-label">Series Wins</span><span class="stat-value gold">${getSeriesWins(s.idx)}</span></div>
+        <div class="stat-row"><span class="stat-label">Months Won</span><span class="stat-value gold">${monthsWon[s.idx]}</span></div>
       </div>`;
   });
   if(!matches.length)grid.innerHTML+=`<div class="empty-state" style="grid-column:1/-1"><span class="big">NO GAMES YET</span>Head to Log Game to add your first result</div>`;
+
+  // ── Mobile compact table ──
+  const ctbody=document.getElementById('standings-compact-tbody');
+  if(ctbody){
+    ctbody.innerHTML=stats.map((s,rank)=>{
+      const sc=s.streak;
+      const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}" style="font-size:10px;padding:1px 5px;">${sc.count}${sc.type}</span>`:'';
+      return `<tr>
+        <td class="sct-rank">${rankEmoji[rank]||rank+1}</td>
+        <td>
+          <div class="sct-name">${fi(s)} ${s.name} ${sh}</div>
+          <div class="sct-team" style="${teamColourStyle(s.team)}">${s.team||'—'}</div>
+        </td>
+        <td><span class="sct-pts">${s.pts}</span></td>
+        <td><span class="num" style="color:var(--green);font-size:16px">${s.wins}</span></td>
+        <td><span class="num" style="font-size:16px">${s.draws}</span></td>
+        <td><span class="num" style="color:var(--red);font-size:16px">${s.losses}</span></td>
+        <td><span class="num" style="color:${s.gd>=0?'var(--green)':'var(--red)'};font-size:16px">${s.gd>=0?'+':''}${s.gd}</span></td>
+        <td><span class="num" style="color:var(--blue);font-size:16px">${s.cs}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Mobile detail cards (full stats, stacked below table) ──
+  const detail=document.getElementById('standings-detail-cards');
+  if(detail){
+    detail.innerHTML=stats.map((s,rank)=>{
+      const rc=['rank-1','rank-2','rank-3'][rank]||'';
+      const sc=s.streak;
+      const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}">${sc.count}${sc.type}</span>`:'';
+      return `
+        <div class="player-card ${rc}" style="margin-bottom:12px;">
+          <div class="rank-badge">${rank+1}</div>
+          <div class="player-name-big">${fi(s)} ${s.name} ${sh}</div>
+          <div class="player-team-sub" style="${teamColourStyle(s.team)}">${s.team||'—'}</div>
+          <div style="margin-bottom:12px">
+            <div class="pts-big" style="color:${rank===0?'var(--gold)':'var(--green)'}">${s.pts}</div>
+            <div class="pts-label">Points</div>
+          </div>
+          <div class="stat-row"><span class="stat-label">Played</span><span class="stat-value">${s.played}</span></div>
+          <div class="stat-row"><span class="stat-label">W / D / L</span><span class="stat-value"><span class="green">${s.wins}</span> / ${s.draws} / <span class="red">${s.losses}</span></span></div>
+          <div class="stat-row"><span class="stat-label">Goals For</span><span class="stat-value">${s.gf}</span></div>
+          <div class="stat-row"><span class="stat-label">Goals Against</span><span class="stat-value">${s.ga}</span></div>
+          <div class="stat-row"><span class="stat-label">Goal Diff</span><span class="stat-value ${s.gd>=0?'green':'red'}">${s.gd>=0?'+':''}${s.gd}</span></div>
+          <div class="stat-row"><span class="stat-label">Clean Sheets</span><span class="stat-value blue">${s.cs}</span></div>
+          <div class="stat-row"><span class="stat-label">Win %</span><span class="stat-value">${s.played>0?Math.round((s.wins/s.played)*100)+'%':'—'}</span></div>
+          <div class="stat-row"><span class="stat-label">Series Wins</span><span class="stat-value gold">${getSeriesWins(s.idx)}</span></div>
+          <div class="stat-row"><span class="stat-label">Months Won</span><span class="stat-value gold">${monthsWon[s.idx]}</span></div>
+        </div>`;
+    }).join('');
+    if(!matches.length)detail.innerHTML=`<div class="empty-state"><span class="big">NO GAMES YET</span>Head to Log Game to add your first result</div>`;
+  }
 }
 
 /* ── MONTHLY ── */
@@ -1606,15 +1710,16 @@ function renderHistory(){
     let badge='';
     if(m.matchType==='et')badge=`<span class="match-type-badge badge-et">ET</span>`;
     if(m.matchType==='pen')badge=`<span class="match-type-badge badge-pen">PEN — ${players[m.penWinner]?.name||'?'}</span>`;
-    // Series clinch indicator
     let seriesBadge='';
     if(m.seriesClinch){
       const winnerIdx=matchResult(m,m.home)==='W'?m.home:matchResult(m,m.away)==='W'?m.away:null;
       const winnerName=winnerIdx!==null?players[winnerIdx]?.name:'';
       seriesBadge=`<span class="badge-series">🏆 Series win${winnerName?' · '+winnerName:''}</span>`;
     }
-    let scorerRow='';
+    let scorerToggle='';
+    let scorerBody='';
     if(m.scorers&&m.scorers.length){
+      const sid2=String(m.id);
       const parts=m.scorers.map(s=>{
         const pill=s.team?' <span style="color:var(--muted);font-size:11px">('+s.team+')</span>':'';
         const g=s.goals>0?' ⚽'+s.goals:'';
@@ -1625,7 +1730,9 @@ function renderHistory(){
         const a=s.assists>0?' 🅰️'+s.assists:'';
         return '<strong>'+s.name+'</strong>'+pill+g+h+fk+ls+pen+a;
       });
-      scorerRow='<div class="match-scorers-row">'+parts.join(' &nbsp;·&nbsp; ')+'</div>';
+      const count=m.scorers.length;
+      scorerToggle=`<button class="scorers-toggle-btn" onclick="toggleMatchScorers('scb-${sid2}',this)">▾ ${count} scorer${count!==1?'s':''}</button>`;
+      scorerBody=`<div class="match-scorers-body" id="scb-${sid2}"><div class="match-scorers-row">${parts.join(' &nbsp;·&nbsp; ')}</div></div>`;
     }
     const sid=String(m.id);
     return `
@@ -1642,8 +1749,9 @@ function renderHistory(){
           <button class="match-action-btn edit-btn" data-id="${sid}" title="Edit">✏️</button>
           <button class="match-action-btn del delete-btn" data-id="${sid}" title="Delete">🗑</button>
         </div>
-        ${scorerRow}
         ${seriesBadge?'<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">'+seriesBadge+'</div>':''}
+        ${scorerToggle}
+        ${scorerBody}
       </div>`;
   }).join('');
 
@@ -1659,6 +1767,14 @@ function renderHistory(){
       openEditModal(this.getAttribute('data-id'));
     });
   });
+}
+
+function toggleMatchScorers(id, btn){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.toggle('open');
+  const count=btn.textContent.match(/\d+/)?.[0]||'';
+  btn.textContent=el.classList.contains('open')?`▴ ${count} scorer${count!=='1'?'s':''}`:`▾ ${count} scorer${count!=='1'?'s':''}`;
 }
 function deleteMatch(id){
   matches=matches.filter(m=>String(m.id)!==String(id));saveData();renderHistory();
@@ -1903,19 +2019,61 @@ function backfillDates(){
   if(changed)saveData();
 }
 
-// Hard-set offline series wins: James = 1, Aadhil = 1
-// Runs once, overwrites whatever is stored
-function backfillSeriesWins(){
-  if(localStorage.getItem('anker_series_backfilled_v2'))return;
+// One-time migration: set baseSeriesWins for James=1, Aadhil=1
+// These represent pre-logging history and never change
+function migrateBaseSeriesWins(){
+  if(localStorage.getItem('anker_base_series_v1'))return;
   players.forEach(p=>{
-    const n=p.name.toLowerCase();
-    if(n.includes('james')) p.seriesWins=1;
-    if(n.includes('aadhil')) p.seriesWins=1;
+    if(p.baseSeriesWins===undefined){
+      const n=p.name.toLowerCase();
+      p.baseSeriesWins=(n.includes('james')||n.includes('aadhil'))?1:0;
+    }
   });
   saveData();
-  localStorage.setItem('anker_series_backfilled_v2','1');
-  // Clear old flag too
-  localStorage.removeItem('anker_series_backfilled');
+  localStorage.setItem('anker_base_series_v1','1');
+}
+
+// Compute series wins dynamically: base offset + clinch matches won
+function getSeriesWins(playerIdx){
+  const base=players[playerIdx]?.baseSeriesWins||0;
+  const fromMatches=matches.filter(m=>{
+    if(!m.seriesClinch)return false;
+    return matchResult(m,playerIdx)==='W';
+  }).length;
+  return base+fromMatches;
+}
+
+// Months Won: count completed past months where a player led on points (no ties)
+function getMonthsWon(){
+  const now=new Date();
+  const curYM=now.getFullYear()*100+now.getMonth();
+  // Gather all unique YYYY-MM keys from matches, excluding current month
+  const monthKeys=new Set();
+  matches.forEach(m=>{
+    if(!m.dateISO)return;
+    const d=new Date(m.dateISO);
+    const ym=d.getFullYear()*100+d.getMonth();
+    if(ym<curYM)monthKeys.add(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  });
+  // For each month, compute standings and find winner (no award on tie)
+  const wins=players.map(()=>0);
+  monthKeys.forEach(key=>{
+    const [y,mo]=key.split('-').map(Number);
+    const start=new Date(y,mo-1,1),end=new Date(y,mo,0,23,59,59);
+    const subset=matches.filter(m=>{
+      if(!m.dateISO)return false;
+      const d=new Date(m.dateISO);
+      return d>=start&&d<=end;
+    });
+    if(!subset.length)return;
+    const stats=getStats(subset);
+    // stats sorted by pts desc; check for tie at top
+    if(stats.length<2||stats[0].pts>stats[1].pts){
+      wins[stats[0].idx]++;
+    }
+    // tie = no award
+  });
+  return wins;
 }
 
 // Boot: load from local cache instantly, then sync from cloud in background
@@ -1925,14 +2083,14 @@ function backfillSeriesWins(){
     showTeamSetup();
   } else if(localResult===true&&players.length===3){
     backfillDates();
-    backfillSeriesWins();
+    migrateBaseSeriesWins();
     launchApp();
   }
   // Always try to sync from cloud (updates UI if newer data found)
   const cloudResult=await cloudLoad();
   if(cloudResult==='synced'&&players.length===3){
     backfillDates();
-    backfillSeriesWins();
+    migrateBaseSeriesWins();
     launchApp();
   } else if(cloudResult==='empty'&&!localResult){
     document.getElementById('setup-screen').style.display='block';
@@ -1940,45 +2098,8 @@ function backfillSeriesWins(){
   }
 })();
 
-/* ── LOG RESULT BUTTON STATE ── */
-function updateLogBtn(){
-  const btn=document.getElementById('log-result-btn');
-  if(!btn)return;
-  const hg=parseInt(document.getElementById('home-score')?.value)||0;
-  const ag=parseInt(document.getElementById('away-score')?.value)||0;
-  const hasScorers=document.querySelectorAll('#scorers-list .scorer-row').length>0;
-  const ready=hg>0||ag>0||hasScorers;
-  if(ready){
-    btn.style.background='var(--green)';
-    btn.style.color='#000';
-    btn.style.borderColor='var(--green)';
-    btn.style.boxShadow='0 4px 16px rgba(0,255,135,0.25)';
-  } else {
-    btn.style.background='var(--surface3)';
-    btn.style.color='var(--muted)';
-    btn.style.borderColor='var(--border)';
-    btn.style.boxShadow='none';
-  }
-}
-
-// Watch score inputs
-document.addEventListener('input', function(e){
-  if(e.target.id==='home-score'||e.target.id==='away-score') updateLogBtn();
-});
-// Watch scorer rows being added/removed (MutationObserver)
-const scorerListObserver=new MutationObserver(updateLogBtn);
-document.addEventListener('DOMContentLoaded',()=>{
-  const sl=document.getElementById('scorers-list');
-  if(sl) scorerListObserver.observe(sl,{childList:true});
-});
-// Also call after launchApp since DOMContentLoaded may have already fired
-const _origLaunchApp=launchApp;
-launchApp=function(){
-  _origLaunchApp();
-  updateLogBtn();
-  const sl=document.getElementById('scorers-list');
-  if(sl) scorerListObserver.observe(sl,{childList:true});
-};
+// Close modal on overlay click
+document.getElementById('edit-modal').addEventListener('click',function(e){if(e.target===this)closeEditModal();});
 
 // Confirm delete dialog
 document.getElementById('confirm-delete-btn').addEventListener('click',function(){

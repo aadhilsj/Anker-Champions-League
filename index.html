@@ -642,12 +642,6 @@
         <button class="add-scorer-btn" onclick="addScorerRow()">+ Add scorer / assister</button>
       </div>
 
-      <div class="dnp-section">
-        <h3>🪑 Did Not Play (DNP)</h3>
-        <p class="hint">Optional — tag players who didn't feature. Everyone else gets the game.</p>
-        <div class="dnp-teams" id="dnp-teams-log"></div>
-      </div>
-
       <button class="btn" onclick="logGame()" style="margin-top:20px">LOG RESULT</button>
     </div>
   </div>
@@ -1439,15 +1433,11 @@ function getCleanSheets(idx,subset){
   return (subset||matches).filter(m=>(m.home===idx&&m.ag===0)||(m.away===idx&&m.hg===0)).length;
 }
 
-// Series wins: hardcoded base (1 each for James & Aadhil) + tally from match history
 const SERIES_BASE={'james':1,'aadhil':1};
 function getSeriesWins(idx){
   const p=players[idx];
   const base=SERIES_BASE[p?.name?.toLowerCase()?.trim()]||0;
-  const fromMatches=matches.filter(m=>{
-    if(!m.seriesClinch)return false;
-    return matchResult(m,idx)==='W';
-  }).length;
+  const fromMatches=matches.filter(m=>m.seriesClinch&&matchResult(m,idx)==='W').length;
   return base+fromMatches;
 }
 function getStats(subset){

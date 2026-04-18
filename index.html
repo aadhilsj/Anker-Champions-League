@@ -190,20 +190,30 @@
   .match-scorers-body.open{display:block;}
   .scorers-toggle-btn{background:transparent;border:none;color:var(--muted);font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);width:100%;transition:color 0.2s;}
   .scorers-toggle-btn:hover{color:var(--green);}
-  /* Compact standings table on mobile */
-  .standings-compact{display:none;}
-  .standings-compact-table{width:100%;border-collapse:collapse;}
-  .standings-compact-table th{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
-  .standings-compact-table th:not(:first-child){text-align:center;}
-  .standings-compact-table td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;vertical-align:middle;}
-  .standings-compact-table td:not(:first-child){text-align:center;}
-  .standings-compact-table tr:last-child td{border-bottom:none;}
-  .standings-compact-table tr:hover td{background:rgba(255,255,255,0.02);}
-  .sct-name{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:0.5px;}
-  .sct-team{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:1px;}
-  .sct-pts{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);}
-  .sct-rank{font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--muted);width:20px;}
-  .player-detail-cards{margin-top:16px;}
+  /* Slim cards - mobile standings */
+  .standings-slim{display:none;gap:10px;flex-direction:column;}
+  .slim-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden;}
+  .slim-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;opacity:0;}
+  .slim-card.rank-1::before{opacity:1;background:var(--gold);}
+  .slim-card.rank-2::before{opacity:1;background:#c0c0c0;}
+  .slim-card.rank-3::before{opacity:1;background:#cd7f32;}
+  .slim-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .slim-header-left{display:flex;align-items:center;gap:8px;min-width:0;}
+  .slim-rank{font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--muted);flex-shrink:0;}
+  .slim-name{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;line-height:1;}
+  .slim-team{font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:1px;}
+  .slim-pts-block{text-align:right;flex-shrink:0;}
+  .slim-pts{font-family:'Bebas Neue',sans-serif;font-size:38px;line-height:1;}
+  .slim-pts-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;}
+  .slim-chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:2px;}
+  .slim-chip{background:var(--surface2);border-radius:8px;padding:6px 4px;text-align:center;}
+  .slim-chip.gold-chip{background:rgba(245,200,66,0.08);border:1px solid rgba(245,200,66,0.15);}
+  .slim-chip-label{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:2px;}
+  .slim-chip-val{font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1;display:block;}
+  .slim-wdl{display:flex;gap:4px;margin-bottom:6px;}
+  .slim-wdl-chip{flex:1;background:var(--surface2);border-radius:8px;padding:6px 4px;text-align:center;}
+  .slim-divider{height:1px;background:var(--border);margin:10px 0;}
+  .slim-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 
   /* EDIT MODAL */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
@@ -391,7 +401,7 @@
 
     /* Standings */
     .standings-grid{display:none;}
-    .standings-compact{display:block;}
+    .standings-slim{display:flex;}
     .player-detail-cards .player-card{margin-bottom:12px;}
 
     /* Match items */
@@ -610,25 +620,8 @@
 
   <!-- STANDINGS -->
   <div id="tab-standings">
-    <!-- Mobile compact table -->
-    <div class="standings-compact">
-      <div class="log-card" style="padding:0;overflow:hidden;margin-bottom:16px;">
-        <table class="standings-compact-table" id="standings-compact-table">
-          <thead><tr>
-            <th style="width:20px"></th>
-            <th>Player</th>
-            <th>Pts</th>
-            <th>W</th>
-            <th>D</th>
-            <th>L</th>
-            <th>GD</th>
-            <th>CS</th>
-          </tr></thead>
-          <tbody id="standings-compact-tbody"></tbody>
-        </table>
-      </div>
-      <div class="player-detail-cards" id="standings-detail-cards"></div>
-    </div>
+    <!-- Mobile slim cards (replaces table + old cards) -->
+    <div class="standings-slim" id="standings-slim"></div>
     <!-- Desktop grid -->
     <div class="standings-grid" id="standings-grid"></div>
   </div>
@@ -1509,7 +1502,7 @@ function renderStandings(){
   const rankEmoji=['🥇','🥈','🥉'];
   const fi=s=>s.played===0?'':s.wins>s.losses?'🔥':s.losses>s.wins?'❄️':'⚡';
 
-  // ── Desktop grid (unchanged) ──
+  // ── Desktop grid ──
   const grid=document.getElementById('standings-grid');grid.innerHTML='';
   stats.forEach((s,rank)=>{
     const rc=['rank-1','rank-2','rank-3'][rank]||'';
@@ -1537,57 +1530,90 @@ function renderStandings(){
   });
   if(!matches.length)grid.innerHTML+=`<div class="empty-state" style="grid-column:1/-1"><span class="big">NO GAMES YET</span>Head to Log Game to add your first result</div>`;
 
-  // ── Mobile compact table ──
-  const ctbody=document.getElementById('standings-compact-tbody');
-  if(ctbody){
-    ctbody.innerHTML=stats.map((s,rank)=>{
-      const sc=s.streak;
-      const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}" style="font-size:10px;padding:1px 5px;">${sc.count}${sc.type}</span>`:'';
-      return `<tr>
-        <td class="sct-rank">${rankEmoji[rank]||rank+1}</td>
-        <td>
-          <div class="sct-name">${fi(s)} ${s.name} ${sh}</div>
-          <div class="sct-team" style="${teamColourStyle(s.team)}">${s.team||'—'}</div>
-        </td>
-        <td><span class="sct-pts">${s.pts}</span></td>
-        <td><span class="num" style="color:var(--green);font-size:16px">${s.wins}</span></td>
-        <td><span class="num" style="font-size:16px">${s.draws}</span></td>
-        <td><span class="num" style="color:var(--red);font-size:16px">${s.losses}</span></td>
-        <td><span class="num" style="color:${s.gd>=0?'var(--green)':'var(--red)'};font-size:16px">${s.gd>=0?'+':''}${s.gd}</span></td>
-        <td><span class="num" style="color:var(--blue);font-size:16px">${s.cs}</span></td>
-      </tr>`;
-    }).join('');
+  // ── Mobile slim cards ──
+  const slim=document.getElementById('standings-slim');
+  if(!slim)return;
+  if(!matches.length){
+    slim.innerHTML=`<div class="empty-state"><span class="big">NO GAMES YET</span>Head to Log Game to add your first result</div>`;
+    return;
   }
-
-  // ── Mobile detail cards (full stats, stacked below table) ──
-  const detail=document.getElementById('standings-detail-cards');
-  if(detail){
-    detail.innerHTML=stats.map((s,rank)=>{
-      const rc=['rank-1','rank-2','rank-3'][rank]||'';
-      const sc=s.streak;
-      const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}">${sc.count}${sc.type}</span>`:'';
-      return `
-        <div class="player-card ${rc}" style="margin-bottom:12px;">
-          <div class="rank-badge">${rank+1}</div>
-          <div class="player-name-big">${fi(s)} ${s.name} ${sh}</div>
-          <div class="player-team-sub" style="${teamColourStyle(s.team)}">${s.team||'—'}</div>
-          <div style="margin-bottom:12px">
-            <div class="pts-big" style="color:${rank===0?'var(--gold)':'var(--green)'}">${s.pts}</div>
-            <div class="pts-label">Points</div>
+  slim.innerHTML=stats.map((s,rank)=>{
+    const rc=['rank-1','rank-2','rank-3'][rank]||'';
+    const sc=s.streak;
+    const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}">${sc.count}${sc.type}</span>`:'';
+    const ptsColor=rank===0?'var(--gold)':'var(--green)';
+    const gdColor=s.gd>=0?'var(--green)':'var(--red)';
+    const gdStr=(s.gd>=0?'+':'')+s.gd;
+    const winPct=s.played>0?Math.round((s.wins/s.played)*100)+'%':'—';
+    const teamStyle=teamColourStyle(s.team);
+    return `
+      <div class="slim-card ${rc}">
+        <div class="slim-header">
+          <div class="slim-header-left">
+            <span class="slim-rank">${rankEmoji[rank]||rank+1}</span>
+            <div>
+              <div class="slim-name">${fi(s)} ${s.name} ${sh}</div>
+              <div class="slim-team" style="${teamStyle}">${s.team||'—'}</div>
+            </div>
           </div>
-          <div class="stat-row"><span class="stat-label">Played</span><span class="stat-value">${s.played}</span></div>
-          <div class="stat-row"><span class="stat-label">W / D / L</span><span class="stat-value"><span class="green">${s.wins}</span> / ${s.draws} / <span class="red">${s.losses}</span></span></div>
-          <div class="stat-row"><span class="stat-label">Goals For</span><span class="stat-value">${s.gf}</span></div>
-          <div class="stat-row"><span class="stat-label">Goals Against</span><span class="stat-value">${s.ga}</span></div>
-          <div class="stat-row"><span class="stat-label">Goal Diff</span><span class="stat-value ${s.gd>=0?'green':'red'}">${s.gd>=0?'+':''}${s.gd}</span></div>
-          <div class="stat-row"><span class="stat-label">Clean Sheets</span><span class="stat-value blue">${s.cs}</span></div>
-          <div class="stat-row"><span class="stat-label">Win %</span><span class="stat-value">${s.played>0?Math.round((s.wins/s.played)*100)+'%':'—'}</span></div>
-          <div class="stat-row"><span class="stat-label">Series Wins</span><span class="stat-value gold">${getSeriesWins(s.idx)}</span></div>
-          <div class="stat-row"><span class="stat-label">Months Won</span><span class="stat-value gold">${monthsWon[s.idx]}</span></div>
-        </div>`;
-    }).join('');
-    if(!matches.length)detail.innerHTML=`<div class="empty-state"><span class="big">NO GAMES YET</span>Head to Log Game to add your first result</div>`;
-  }
+          <div class="slim-pts-block">
+            <div class="slim-pts" style="color:${ptsColor}">${s.pts}</div>
+            <div class="slim-pts-label">Points</div>
+          </div>
+        </div>
+
+        <div class="slim-wdl">
+          <div class="slim-wdl-chip">
+            <span class="slim-chip-label">W</span>
+            <span class="slim-chip-val" style="color:var(--green)">${s.wins}</span>
+          </div>
+          <div class="slim-wdl-chip">
+            <span class="slim-chip-label">D</span>
+            <span class="slim-chip-val">${s.draws}</span>
+          </div>
+          <div class="slim-wdl-chip">
+            <span class="slim-chip-label">L</span>
+            <span class="slim-chip-val" style="color:var(--red)">${s.losses}</span>
+          </div>
+          <div class="slim-wdl-chip">
+            <span class="slim-chip-label">Played</span>
+            <span class="slim-chip-val">${s.played}</span>
+          </div>
+        </div>
+
+        <div class="slim-chips">
+          <div class="slim-chip">
+            <span class="slim-chip-label">GF</span>
+            <span class="slim-chip-val" style="color:var(--green)">${s.gf}</span>
+          </div>
+          <div class="slim-chip">
+            <span class="slim-chip-label">GA</span>
+            <span class="slim-chip-val" style="color:var(--red)">${s.ga}</span>
+          </div>
+          <div class="slim-chip">
+            <span class="slim-chip-label">GD</span>
+            <span class="slim-chip-val" style="color:${gdColor}">${gdStr}</span>
+          </div>
+          <div class="slim-chip">
+            <span class="slim-chip-label">CS</span>
+            <span class="slim-chip-val" style="color:var(--blue)">${s.cs}</span>
+          </div>
+          <div class="slim-chip">
+            <span class="slim-chip-label">Win %</span>
+            <span class="slim-chip-val">${winPct}</span>
+          </div>
+          <div class="slim-chip gold-chip">
+            <span class="slim-chip-label">Series W</span>
+            <span class="slim-chip-val" style="color:var(--gold)">${getSeriesWins(s.idx)}</span>
+          </div>
+          <div class="slim-chip gold-chip">
+            <span class="slim-chip-label">Months W</span>
+            <span class="slim-chip-val" style="color:var(--gold)">${monthsWon[s.idx]}</span>
+          </div>
+          <div class="slim-chip" style="visibility:hidden"></div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 /* ── MONTHLY ── */

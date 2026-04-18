@@ -4,14 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anker Champions League</title>
-<meta name="theme-color" content="#0a0a0f">
-<meta name="description" content="Track results, standings, scorers, and head-to-head stats for the Anker Champions League.">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Anker CL">
-<link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -193,6 +185,25 @@
   .match-action-btn:hover{color:var(--green);}
   .match-action-btn.del:hover{color:var(--red);}
   .match-scorers-row{font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+  /* Collapsible scorers */
+  .match-scorers-body{display:none;}
+  .match-scorers-body.open{display:block;}
+  .scorers-toggle-btn{background:transparent;border:none;color:var(--muted);font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:4px;margin-top:6px;padding-top:6px;border-top:1px solid var(--border);width:100%;transition:color 0.2s;}
+  .scorers-toggle-btn:hover{color:var(--green);}
+  /* Compact standings table on mobile */
+  .standings-compact{display:none;}
+  .standings-compact-table{width:100%;border-collapse:collapse;}
+  .standings-compact-table th{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+  .standings-compact-table th:not(:first-child){text-align:center;}
+  .standings-compact-table td{padding:10px 10px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;vertical-align:middle;}
+  .standings-compact-table td:not(:first-child){text-align:center;}
+  .standings-compact-table tr:last-child td{border-bottom:none;}
+  .standings-compact-table tr:hover td{background:rgba(255,255,255,0.02);}
+  .sct-name{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:0.5px;}
+  .sct-team{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:1px;}
+  .sct-pts{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);}
+  .sct-rank{font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--muted);width:20px;}
+  .player-detail-cards{margin-top:16px;}
 
   /* EDIT MODAL */
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
@@ -260,12 +271,6 @@
   /* ── COMPACT TOPBAR BUTTONS ── */
   .topbar-action{background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11px;padding:4px 9px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
   .topbar-action:hover{border-color:var(--green);color:var(--green);}
-  .topbar-action.install-ready{border-color:rgba(0,255,135,0.35);color:var(--green);}
-  .topbar-action[hidden]{display:none!important;}
-  .pwa-banner{display:none;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(135deg,rgba(0,255,135,0.08),rgba(78,168,222,0.08));border:1px solid rgba(0,255,135,0.16);border-radius:14px;padding:12px 14px;margin-bottom:18px;}
-  .pwa-banner.visible{display:flex;}
-  .pwa-banner-copy strong{display:block;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--green);margin-bottom:3px;}
-  .pwa-banner-copy span{display:block;font-size:13px;color:var(--text);}
 
   /* ── VALIDATION WARNING ── */
   .validation-warn{background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--gold);margin-top:10px;display:none;}
@@ -316,10 +321,13 @@
       display:flex;
       position:fixed;
       bottom:0;left:0;right:0;
-      background:var(--surface);
-      border-top:1px solid var(--border);
+      background:rgba(17,17,24,0.92);
+      backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(16px);
+      border-top:1px solid rgba(255,255,255,0.06);
       z-index:150;
       padding:0;
+      padding-bottom:env(safe-area-inset-bottom);
     }
     .bottom-nav-btn{
       flex:1;
@@ -330,6 +338,7 @@
       padding:10px 4px 14px;
       background:transparent;
       border:none;
+      border-top:2px solid transparent;
       color:var(--muted);
       font-family:'DM Sans',sans-serif;
       font-size:9px;
@@ -337,12 +346,13 @@
       text-transform:uppercase;
       cursor:pointer;
       gap:4px;
-      transition:color 0.2s;
+      transition:color 0.2s, border-color 0.2s;
       -webkit-tap-highlight-color:transparent;
     }
-    .bottom-nav-btn .nav-icon{font-size:18px;line-height:1;}
-    .bottom-nav-btn.active{color:var(--green);}
-    .bottom-nav-btn:active{opacity:0.7;}
+    .bottom-nav-btn .nav-icon{font-size:18px;line-height:1;transition:transform 0.2s;}
+    .bottom-nav-btn.active{color:var(--green);border-top-color:var(--green);}
+    .bottom-nav-btn.active .nav-icon{transform:translateY(-1px) scale(1.1);}
+    .bottom-nav-btn:active{opacity:0.6;}
 
     /* Cards */
     .log-card{padding:16px 14px;border-radius:12px;}
@@ -376,9 +386,9 @@
     .score-inputs input{font-size:22px;padding:10px;}
 
     /* Standings */
-    .standings-grid{grid-template-columns:1fr;gap:12px;}
-    .pts-big{font-size:38px;}
-    .player-name-big{font-size:20px;}
+    .standings-grid{display:none;}
+    .standings-compact{display:block;}
+    .player-detail-cards .player-card{margin-bottom:12px;}
 
     /* Match items */
     .match-main{grid-template-columns:1fr auto auto auto;gap:8px;}
@@ -539,24 +549,15 @@
   <!-- MOBILE BOTTOM NAV -->
   <nav class="bottom-nav">
     <button class="bottom-nav-btn active" id="bnav-standings" onclick="switchTab('standings')"><span class="nav-icon">🏆</span>All Time</button>
-    <button class="bottom-nav-btn" id="bnav-log" onclick="switchTab('log')"><span class="nav-icon">➕</span>Log</button>
     <button class="bottom-nav-btn" id="bnav-monthly" onclick="switchTab('monthly')"><span class="nav-icon">📅</span>Monthly</button>
     <button class="bottom-nav-btn" id="bnav-h2h" onclick="switchTab('h2h')"><span class="nav-icon">⚔️</span>H2H</button>
-    <button class="bottom-nav-btn" id="bnav-history" onclick="switchTab('history')"><span class="nav-icon">📋</span>History</button>
     <button class="bottom-nav-btn" id="bnav-scorers" onclick="switchTab('scorers')"><span class="nav-icon">⚽</span>Scorers</button>
+    <button class="bottom-nav-btn" id="bnav-history" onclick="switchTab('history')"><span class="nav-icon">📋</span>History</button>
   </nav>
-  <div class="pwa-banner" id="pwa-banner">
-    <div class="pwa-banner-copy">
-      <strong>Install App</strong>
-      <span>Save this tracker to your home screen for a full-screen, offline-friendly version.</span>
-    </div>
-    <button class="btn sm" id="install-banner-btn" type="button">Install</button>
-  </div>
   <div class="top-bar">
     <div class="top-bar-name" id="session-label"></div>
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
       <span id="sync-status" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);"></span>
-      <button class="topbar-action" id="install-app-btn" type="button" hidden>Install app</button>
       <button class="topbar-action" onclick="showDataPanel()">⬇ Export</button>
       <button class="topbar-action" onclick="showImportPanel()">⬆ Import</button>
       <button class="topbar-action" onclick="resetSession()">Reset</button>
@@ -594,8 +595,8 @@
     <button class="tab-btn" onclick="switchTab('log')">Log Game</button>
     <button class="tab-btn" onclick="switchTab('monthly')">Monthly</button>
     <button class="tab-btn" onclick="switchTab('h2h')">H2H</button>
-    <button class="tab-btn" onclick="switchTab('history')">History</button>
     <button class="tab-btn" onclick="switchTab('scorers')">Scorers</button>
+    <button class="tab-btn" onclick="switchTab('history')">History</button>
   </div>
 
   <!-- FLOATING ACTION BUTTON -->
@@ -604,7 +605,29 @@
   </button>
 
   <!-- STANDINGS -->
-  <div id="tab-standings"><div class="standings-grid" id="standings-grid"></div></div>
+  <div id="tab-standings">
+    <!-- Mobile compact table -->
+    <div class="standings-compact">
+      <div class="log-card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+        <table class="standings-compact-table" id="standings-compact-table">
+          <thead><tr>
+            <th style="width:20px"></th>
+            <th>Player</th>
+            <th>Pts</th>
+            <th>W</th>
+            <th>D</th>
+            <th>L</th>
+            <th>GD</th>
+            <th>CS</th>
+          </tr></thead>
+          <tbody id="standings-compact-tbody"></tbody>
+        </table>
+      </div>
+      <div class="player-detail-cards" id="standings-detail-cards"></div>
+    </div>
+    <!-- Desktop grid -->
+    <div class="standings-grid" id="standings-grid"></div>
+  </div>
 
   <!-- LOG GAME -->
   <div id="tab-log" style="display:none">
@@ -771,28 +794,6 @@ let currentMatchType='normal', editMatchType='normal', editingMatchId=null;
 let mgrSort={col:'goals', dir:'desc'};
 let plyrSort={col:'goals', dir:'desc'};
 let plyrView='overview'; // 'overview' | 'types'
-let deferredInstallPrompt=null;
-
-function updateInstallUi(){
-  const installBtn=document.getElementById('install-app-btn');
-  const installBanner=document.getElementById('pwa-banner');
-  const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
-  const canInstall=!!deferredInstallPrompt&&!isStandalone;
-  if(installBtn){
-    installBtn.hidden=!canInstall;
-    installBtn.classList.toggle('install-ready',canInstall);
-  }
-  if(installBanner)installBanner.classList.toggle('visible',canInstall);
-}
-
-async function promptInstall(){
-  if(!deferredInstallPrompt)return;
-  const promptEvent=deferredInstallPrompt;
-  deferredInstallPrompt=null;
-  updateInstallUi();
-  await promptEvent.prompt();
-  await promptEvent.userChoice;
-}
 
 function setPlyrView(view){
   plyrView=view;
@@ -822,61 +823,10 @@ const HARDCODED_BIN_ID='69d87cca36566621a898f51e';
 let binId=HARDCODED_BIN_ID;
 localStorage.setItem(LS_BIN_KEY, HARDCODED_BIN_ID);
 let syncTimeout=null;
-let currentDataUpdatedAt=0;
 
 function setSyncStatus(msg, colour='var(--muted)'){
   const el=document.getElementById('sync-status');
   if(el){el.textContent=msg;el.style.color=colour;}
-}
-
-function getLegacySeriesBaseline(name){
-  const n=(name||'').toLowerCase();
-  return (n.includes('james')||n.includes('aadhil')||n.includes('ardil')) ? 1 : 0;
-}
-
-function getMatchWinnerIdx(m){
-  if(!m)return null;
-  return matchResult(m,m.home)==='W' ? m.home : matchResult(m,m.away)==='W' ? m.away : null;
-}
-
-function recomputeSeriesWins(){
-  const totals=players.map(p=>getLegacySeriesBaseline(p.name));
-  matches.forEach(m=>{
-    if(!m.seriesClinch)return;
-    const winnerIdx=getMatchWinnerIdx(m);
-    if(winnerIdx!==null&&totals[winnerIdx]!==undefined)totals[winnerIdx]+=1;
-  });
-  players=players.map((p,i)=>({...p,seriesWins:totals[i]||0}));
-}
-
-function normaliseData(raw){
-  const d=raw||{};
-  const nextMatches=(d.matches||[]).map(m=>({
-    ...m,
-    seriesClinch:!!m.seriesClinch
-  }));
-  let nextPlayers=[];
-  if(Array.isArray(d.players)&&d.players.length===3){
-    if(typeof d.players[0]==='string'){
-      nextPlayers=d.players.map(name=>({name,team:'',seriesWins:getLegacySeriesBaseline(name)}));
-    } else {
-      nextPlayers=d.players.map(p=>({
-        ...p,
-        team:p.team||'',
-        seriesWins:typeof p.seriesWins==='number' ? p.seriesWins : getLegacySeriesBaseline(p.name)
-      }));
-    }
-  }
-  return {
-    players:nextPlayers,
-    matches:nextMatches,
-    updatedAt:Number(d.updatedAt)||0
-  };
-}
-
-function getDataSnapshot(){
-  recomputeSeriesWins();
-  return {players,matches,updatedAt:currentDataUpdatedAt||Date.now()};
 }
 
 async function cloudSave(data){
@@ -902,10 +852,9 @@ async function cloudLoad(){
   setSyncStatus('Loading…');
   // Try local cache first for instant load
   const cached=localStorage.getItem(LS_CACHE);
-  let cachedData=null;
   if(cached){
-    cachedData=normaliseData(JSON.parse(cached));
-    applyData(cachedData);
+    const d=JSON.parse(cached);
+    applyData(d);
   }
   // If we have a bin ID, fetch fresh data from cloud
   if(binId){
@@ -915,16 +864,10 @@ async function cloudLoad(){
       });
       const json=await res.json();
       if(json.record){
-        const remoteData=normaliseData(json.record);
-        if(remoteData.updatedAt>=currentDataUpdatedAt){
-          applyData(remoteData);
-          localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
-          setSyncStatus('Synced ✓','var(--green)');
-          return 'synced';
-        }
-        setSyncStatus('Local changes kept','var(--gold)');
-        cloudSave(getDataSnapshot());
-        return cachedData ? 'cached' : 'empty';
+        applyData(json.record);
+        localStorage.setItem(LS_CACHE,JSON.stringify(json.record));
+        setSyncStatus('Synced ✓','var(--green)');
+        return 'synced';
       }
     } catch(e){
       setSyncStatus('Offline — using cached data','var(--gold)');
@@ -936,12 +879,14 @@ async function cloudLoad(){
 }
 
 function applyData(d){
-  const data=normaliseData(d);
-  matches=data.matches;
-  if(!data.players||data.players.length!==3) return;
-  players=data.players;
-  currentDataUpdatedAt=data.updatedAt||Date.now();
-  recomputeSeriesWins();
+  matches=d.matches||[];
+  if(!d.players||d.players.length!==3) return;
+  if(typeof d.players[0]==='string'){
+    players=d.players.map(name=>({name,team:'',seriesWins:0}));
+  } else {
+    // Backfill seriesWins if missing
+    players=d.players.map(p=>({...p,seriesWins:p.seriesWins||0}));
+  }
 }
 
 /* ── STORAGE ── */
@@ -955,31 +900,21 @@ function loadData(){
   }
   const cached=localStorage.getItem(LS_CACHE);
   if(!cached)return false;
-  const d=normaliseData(JSON.parse(cached));
+  const d=JSON.parse(cached);
   matches=d.matches||[];
-  currentDataUpdatedAt=d.updatedAt||Date.now();
   if(!d.players||d.players.length!==3)return false;
-  if(typeof JSON.parse(cached).players?.[0]==='string'){players=d.players.map(p=>({...p,team:''}));recomputeSeriesWins();return 'noteams';}
+  if(typeof d.players[0]==='string'){players=d.players.map(name=>({name,team:''}));return 'noteams';}
   players=d.players;
-  recomputeSeriesWins();
   return true;
 }
 
 function saveData(){
-  currentDataUpdatedAt=Date.now();
-  const data=getDataSnapshot();
+  const data={players,matches};
   // Always write to local cache immediately
   localStorage.setItem(LS_CACHE,JSON.stringify(data));
   // Debounce cloud save by 1.5s to avoid hammering on rapid changes
   clearTimeout(syncTimeout);
   syncTimeout=setTimeout(()=>cloudSave(data),1500);
-}
-
-function flushCloudSave(){
-  clearTimeout(syncTimeout);
-  const cached=localStorage.getItem(LS_CACHE);
-  if(!cached)return;
-  cloudSave(normaliseData(JSON.parse(cached)));
 }
 
 /* ── TEAM COLOURS ── */
@@ -1143,11 +1078,12 @@ function switchTab(tab){
   ['standings','log','monthly','h2h','history','scorers'].forEach(t=>{
     document.getElementById('tab-'+t).style.display=t===tab?'block':'none';
   });
+  // Desktop tab order: standings, log, monthly, h2h, scorers, history
   document.querySelectorAll('.tab-btn').forEach((b,i)=>{
-    b.classList.toggle('active',['standings','log','monthly','h2h','history','scorers'][i]===tab);
+    b.classList.toggle('active',['standings','log','monthly','h2h','scorers','history'][i]===tab);
   });
-  // Sync bottom nav
-  ['standings','log','monthly','h2h','history','scorers'].forEach(t=>{
+  // Sync bottom nav (log has no bnav — uses FAB instead)
+  ['standings','monthly','h2h','scorers','history'].forEach(t=>{
     const btn=document.getElementById('bnav-'+t);
     if(btn)btn.classList.toggle('active',t===tab);
   });
@@ -1446,6 +1382,15 @@ function logGame(){
   const dnps=collectDNPs(dnpLog,hi,ai);
   const seriesClinch=document.getElementById('series-clinch-toggle').checked;
 
+  // Determine winner for series win
+  if(seriesClinch){
+    const winnerIdx=matchResult({home:hi,away:ai,hg,ag,matchType:currentMatchType,penWinner},hi)==='W'?hi:
+                    matchResult({home:hi,away:ai,hg,ag,matchType:currentMatchType,penWinner},ai)==='W'?ai:null;
+    if(winnerIdx!==null){
+      players[winnerIdx].seriesWins=(players[winnerIdx].seriesWins||0)+1;
+    }
+  }
+
   matches.push({id:Date.now(),
     date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}),
     dateISO:new Date().toISOString().slice(0,10),
@@ -1522,6 +1467,16 @@ function saveEdit(){
   const idx=matches.findIndex(x=>String(x.id)===String(editingMatchId));
   if(idx===-1)return;
   const oldMatch=matches[idx];
+  // Handle series win delta — if clinch status changed, adjust player series wins
+  const oldClinch=!!(oldMatch.seriesClinch);
+  if(oldClinch!==newSeriesClinch){
+    const winnerIdx=matchResult({home:hi,away:ai,hg,ag,matchType:editMatchType,penWinner},hi)==='W'?hi:
+                    matchResult({home:hi,away:ai,hg,ag,matchType:editMatchType,penWinner},ai)==='W'?ai:null;
+    if(winnerIdx!==null){
+      if(newSeriesClinch) players[winnerIdx].seriesWins=(players[winnerIdx].seriesWins||0)+1;
+      else players[winnerIdx].seriesWins=Math.max(0,(players[winnerIdx].seriesWins||0)-1);
+    }
+  }
   matches[idx]={...oldMatch,home:hi,away:ai,hg,ag,matchType:editMatchType,penWinner,scorers,dnps,seriesClinch:newSeriesClinch};
   saveData();closeEditModal();renderHistory();
 }
@@ -1557,18 +1512,20 @@ function getStats(subset){
 
 /* ── RENDER STANDINGS ── */
 function renderStandings(){
-  recomputeSeriesWins();
   const stats=getStats();
+  const rankEmoji=['🥇','🥈','🥉'];
+  const fi=s=>s.played===0?'':s.wins>s.losses?'🔥':s.losses>s.wins?'❄️':'⚡';
+
+  // ── Desktop grid (unchanged) ──
   const grid=document.getElementById('standings-grid');grid.innerHTML='';
   stats.forEach((s,rank)=>{
     const rc=['rank-1','rank-2','rank-3'][rank]||'';
-    const fi=s.played===0?'':s.wins>s.losses?'🔥':s.losses>s.wins?'❄️':'⚡';
     const sc=s.streak;
     const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}">${sc.count}${sc.type}</span>`:'';
     grid.innerHTML+=`
       <div class="player-card ${rc}">
         <div class="rank-badge">${rank+1}</div>
-        <div class="player-name-big">${fi} ${s.name} ${sh}</div>
+        <div class="player-name-big">${fi(s)} ${s.name} ${sh}</div>
         <div class="player-team-sub" style="${teamColourStyle(s.team)}">${s.team||'—'}</div>
         <div style="margin-bottom:12px">
           <div class="pts-big" style="color:${rank===0?'var(--gold)':'var(--green)'}">${s.pts}</div>
@@ -1585,6 +1542,57 @@ function renderStandings(){
       </div>`;
   });
   if(!matches.length)grid.innerHTML+=`<div class="empty-state" style="grid-column:1/-1"><span class="big">NO GAMES YET</span>Head to Log Game to add your first result</div>`;
+
+  // ── Mobile compact table ──
+  const ctbody=document.getElementById('standings-compact-tbody');
+  if(ctbody){
+    ctbody.innerHTML=stats.map((s,rank)=>{
+      const sc=s.streak;
+      const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}" style="font-size:10px;padding:1px 5px;">${sc.count}${sc.type}</span>`:'';
+      return `<tr>
+        <td class="sct-rank">${rankEmoji[rank]||rank+1}</td>
+        <td>
+          <div class="sct-name">${fi(s)} ${s.name} ${sh}</div>
+          <div class="sct-team" style="${teamColourStyle(s.team)}">${s.team||'—'}</div>
+        </td>
+        <td><span class="sct-pts">${s.pts}</span></td>
+        <td><span class="num" style="color:var(--green);font-size:16px">${s.wins}</span></td>
+        <td><span class="num" style="font-size:16px">${s.draws}</span></td>
+        <td><span class="num" style="color:var(--red);font-size:16px">${s.losses}</span></td>
+        <td><span class="num" style="color:${s.gd>=0?'var(--green)':'var(--red)'};font-size:16px">${s.gd>=0?'+':''}${s.gd}</span></td>
+        <td><span class="num" style="color:var(--blue);font-size:16px">${s.cs}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Mobile detail cards (full stats, stacked below table) ──
+  const detail=document.getElementById('standings-detail-cards');
+  if(detail){
+    detail.innerHTML=stats.map((s,rank)=>{
+      const rc=['rank-1','rank-2','rank-3'][rank]||'';
+      const sc=s.streak;
+      const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}">${sc.count}${sc.type}</span>`:'';
+      return `
+        <div class="player-card ${rc}" style="margin-bottom:12px;">
+          <div class="rank-badge">${rank+1}</div>
+          <div class="player-name-big">${fi(s)} ${s.name} ${sh}</div>
+          <div class="player-team-sub" style="${teamColourStyle(s.team)}">${s.team||'—'}</div>
+          <div style="margin-bottom:12px">
+            <div class="pts-big" style="color:${rank===0?'var(--gold)':'var(--green)'}">${s.pts}</div>
+            <div class="pts-label">Points</div>
+          </div>
+          <div class="stat-row"><span class="stat-label">Played</span><span class="stat-value">${s.played}</span></div>
+          <div class="stat-row"><span class="stat-label">W / D / L</span><span class="stat-value"><span class="green">${s.wins}</span> / ${s.draws} / <span class="red">${s.losses}</span></span></div>
+          <div class="stat-row"><span class="stat-label">Goals For</span><span class="stat-value">${s.gf}</span></div>
+          <div class="stat-row"><span class="stat-label">Goals Against</span><span class="stat-value">${s.ga}</span></div>
+          <div class="stat-row"><span class="stat-label">Goal Diff</span><span class="stat-value ${s.gd>=0?'green':'red'}">${s.gd>=0?'+':''}${s.gd}</span></div>
+          <div class="stat-row"><span class="stat-label">Clean Sheets</span><span class="stat-value blue">${s.cs}</span></div>
+          <div class="stat-row"><span class="stat-label">Win %</span><span class="stat-value">${s.played>0?Math.round((s.wins/s.played)*100)+'%':'—'}</span></div>
+          <div class="stat-row"><span class="stat-label">🏆 Series Wins</span><span class="stat-value gold">${players[s.idx]?.seriesWins||0}</span></div>
+        </div>`;
+    }).join('');
+    if(!matches.length)detail.innerHTML=`<div class="empty-state"><span class="big">NO GAMES YET</span>Head to Log Game to add your first result</div>`;
+  }
 }
 
 /* ── MONTHLY ── */
@@ -1707,15 +1715,16 @@ function renderHistory(){
     let badge='';
     if(m.matchType==='et')badge=`<span class="match-type-badge badge-et">ET</span>`;
     if(m.matchType==='pen')badge=`<span class="match-type-badge badge-pen">PEN — ${players[m.penWinner]?.name||'?'}</span>`;
-    // Series clinch indicator
     let seriesBadge='';
     if(m.seriesClinch){
       const winnerIdx=matchResult(m,m.home)==='W'?m.home:matchResult(m,m.away)==='W'?m.away:null;
       const winnerName=winnerIdx!==null?players[winnerIdx]?.name:'';
       seriesBadge=`<span class="badge-series">🏆 Series win${winnerName?' · '+winnerName:''}</span>`;
     }
-    let scorerRow='';
+    let scorerToggle='';
+    let scorerBody='';
     if(m.scorers&&m.scorers.length){
+      const sid2=String(m.id);
       const parts=m.scorers.map(s=>{
         const pill=s.team?' <span style="color:var(--muted);font-size:11px">('+s.team+')</span>':'';
         const g=s.goals>0?' ⚽'+s.goals:'';
@@ -1726,7 +1735,9 @@ function renderHistory(){
         const a=s.assists>0?' 🅰️'+s.assists:'';
         return '<strong>'+s.name+'</strong>'+pill+g+h+fk+ls+pen+a;
       });
-      scorerRow='<div class="match-scorers-row">'+parts.join(' &nbsp;·&nbsp; ')+'</div>';
+      const count=m.scorers.length;
+      scorerToggle=`<button class="scorers-toggle-btn" onclick="toggleMatchScorers('scb-${sid2}',this)">▾ ${count} scorer${count!==1?'s':''}</button>`;
+      scorerBody=`<div class="match-scorers-body" id="scb-${sid2}"><div class="match-scorers-row">${parts.join(' &nbsp;·&nbsp; ')}</div></div>`;
     }
     const sid=String(m.id);
     return `
@@ -1743,8 +1754,9 @@ function renderHistory(){
           <button class="match-action-btn edit-btn" data-id="${sid}" title="Edit">✏️</button>
           <button class="match-action-btn del delete-btn" data-id="${sid}" title="Delete">🗑</button>
         </div>
-        ${scorerRow}
         ${seriesBadge?'<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">'+seriesBadge+'</div>':''}
+        ${scorerToggle}
+        ${scorerBody}
       </div>`;
   }).join('');
 
@@ -1760,6 +1772,14 @@ function renderHistory(){
       openEditModal(this.getAttribute('data-id'));
     });
   });
+}
+
+function toggleMatchScorers(id, btn){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.classList.toggle('open');
+  const count=btn.textContent.match(/\d+/)?.[0]||'';
+  btn.textContent=el.classList.contains('open')?`▴ ${count} scorer${count!=='1'?'s':''}`:`▾ ${count} scorer${count!=='1'?'s':''}`;
 }
 function deleteMatch(id){
   matches=matches.filter(m=>String(m.id)!==String(id));saveData();renderHistory();
@@ -2004,10 +2024,15 @@ function backfillDates(){
   if(changed)saveData();
 }
 
-// Legacy baseline before series-clinch tracking existed
+// Hard-set offline series wins: James = 1, Aadhil = 1
+// Runs once, overwrites whatever is stored
 function backfillSeriesWins(){
   if(localStorage.getItem('anker_series_backfilled_v2'))return;
-  recomputeSeriesWins();
+  players.forEach(p=>{
+    const n=p.name.toLowerCase();
+    if(n.includes('james')) p.seriesWins=1;
+    if(n.includes('aadhil')) p.seriesWins=1;
+  });
   saveData();
   localStorage.setItem('anker_series_backfilled_v2','1');
   // Clear old flag too
@@ -2049,37 +2074,6 @@ document.getElementById('confirm-delete-btn').addEventListener('click',function(
 });
 document.getElementById('confirm-cancel-btn').addEventListener('click',hideConfirm);
 document.getElementById('confirm-overlay').addEventListener('click',function(e){if(e.target===this)hideConfirm();});
-
-document.getElementById('install-app-btn').addEventListener('click',promptInstall);
-document.getElementById('install-banner-btn').addEventListener('click',promptInstall);
-
-window.addEventListener('beforeinstallprompt',event=>{
-  event.preventDefault();
-  deferredInstallPrompt=event;
-  updateInstallUi();
-});
-
-window.addEventListener('appinstalled',()=>{
-  deferredInstallPrompt=null;
-  updateInstallUi();
-  setSyncStatus('App installed ✓','var(--green)');
-});
-
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='hidden')flushCloudSave();
-});
-
-window.addEventListener('beforeunload',flushCloudSave);
-
-window.addEventListener('DOMContentLoaded',updateInstallUi);
-
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('/sw.js').catch(err=>{
-      console.error('Service worker registration failed',err);
-    });
-  });
-}
 </script>
 </body>
 </html>

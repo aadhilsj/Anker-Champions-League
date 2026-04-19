@@ -954,22 +954,17 @@ async function cloudLoad(){
       const json=await res.json();
       if(json.record){
         const remoteData=normaliseData(json.record);
-        if(remoteData.updatedAt>=currentDataUpdatedAt){
-          applyData(remoteData);
-          localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
-          lastConfirmedCloudSyncAt=Date.now();
-          hasPendingLocalChanges=false;
-          setSyncStatus('Synced ✓','var(--green)');
-          setSyncWarning('');
-          updateSyncMeta();
-          return 'synced';
-        }
-        setSyncStatus('Local changes kept','var(--gold)');
-        setSyncWarning('This device kept newer local data and pushed it back to cloud. Refresh your other device before editing there.');
-        hasPendingLocalChanges=true;
+        // The shared JSONBin record is the canonical league state.
+        // Always prefer it when reachable so stale local cache cannot
+        // keep phantom stats alive on a single device.
+        applyData(remoteData);
+        localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
+        lastConfirmedCloudSyncAt=Date.now();
+        hasPendingLocalChanges=false;
+        setSyncStatus('Synced ✓','var(--green)');
+        setSyncWarning('');
         updateSyncMeta();
-        cloudSave(getDataSnapshot());
-        return cachedData ? 'cached' : 'empty';
+        return 'synced';
       }
     } catch(e){
       setSyncStatus('Offline — using cached data','var(--gold)');

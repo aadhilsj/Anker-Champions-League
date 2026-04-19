@@ -1588,6 +1588,7 @@ function saveEdit(){
 
 /* ── STAT ENGINE ── */
 function matchResult(m,idx){
+  if(m.home!==idx&&m.away!==idx)return null;
   if(m.matchType==='pen'&&m.penWinner!==null)return m.penWinner===idx?'W':'L';
   const my=m.home===idx?m.hg:m.ag,their=m.home===idx?m.ag:m.hg;
   return my>their?'W':my<their?'L':'D';
@@ -2180,6 +2181,7 @@ function getSeriesWins(playerIdx){
   const base=getLegacySeriesBaseline(players[playerIdx]?.name);
   const fromMatches=matches.filter(m=>{
     if(!m.seriesClinch)return false;
+    if(m.home!==playerIdx&&m.away!==playerIdx)return false;
     return matchResult(m,playerIdx)==='W';
   }).length;
   return base+fromMatches;

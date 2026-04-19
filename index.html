@@ -1023,6 +1023,7 @@ function saveData(){
 }
 
 function flushCloudSave(){
+  if(!hasPendingLocalChanges)return;
   clearTimeout(syncTimeout);
   const cached=localStorage.getItem(LS_CACHE);
   if(!cached)return;

@@ -52,6 +52,10 @@
   #app-screen{display:none;max-width:960px;margin:0 auto;}
   .top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;}
   .top-bar-name{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--muted);}
+  .sync-meta{display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:180px;}
+  .sync-detail{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);}
+  .sync-warning{display:none;background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.28);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--gold);margin-bottom:16px;line-height:1.45;}
+  .sync-warning.visible{display:block;}
 
   /* TABS */
   .tabs{display:flex;gap:4px;background:var(--surface);border-radius:10px;padding:4px;margin-bottom:28px;border:1px solid var(--border);}
@@ -571,12 +575,16 @@
   <div class="top-bar">
     <div class="top-bar-name" id="session-label"></div>
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-      <span id="sync-status" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);"></span>
+      <div class="sync-meta">
+        <span id="sync-status" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);"></span>
+        <span id="sync-detail" class="sync-detail"></span>
+      </div>
       <button class="topbar-action" onclick="showDataPanel()">⬇ Export</button>
       <button class="topbar-action" onclick="showImportPanel()">⬆ Import</button>
       <button class="topbar-action" onclick="resetSession()">Reset</button>
     </div>
   </div>
+  <div id="sync-warning" class="sync-warning"></div>
 
   <!-- EXPORT PANEL -->
   <div id="data-panel" style="display:none;margin-bottom:20px;">
@@ -817,10 +825,41 @@ let binId=HARDCODED_BIN_ID;
 localStorage.setItem(LS_BIN_KEY, HARDCODED_BIN_ID);
 let syncTimeout=null;
 let currentDataUpdatedAt=0;
+let lastConfirmedCloudSyncAt=0;
+let hasPendingLocalChanges=false;
 
 function setSyncStatus(msg, colour='var(--muted)'){
   const el=document.getElementById('sync-status');
   if(el){el.textContent=msg;el.style.color=colour;}
+}
+
+function formatSyncTime(ts){
+  if(!ts)return 'No cloud sync yet';
+  return 'Last cloud sync ' + new Date(ts).toLocaleString('en-GB',{
+    day:'2-digit',
+    month:'short',
+    hour:'2-digit',
+    minute:'2-digit'
+  });
+}
+
+function setSyncWarning(msg=''){
+  const el=document.getElementById('sync-warning');
+  if(!el)return;
+  el.textContent=msg;
+  el.classList.toggle('visible',!!msg);
+}
+
+function updateSyncMeta(){
+  const el=document.getElementById('sync-detail');
+  if(!el)return;
+  if(hasPendingLocalChanges){
+    el.textContent='Pending local changes';
+    el.style.color='var(--gold)';
+    return;
+  }
+  el.textContent=formatSyncTime(lastConfirmedCloudSyncAt);
+  el.style.color='var(--muted)';
 }
 
 function getLegacySeriesBaseline(name){
@@ -873,11 +912,21 @@ async function cloudSave(data){
       body
     });
     const json=await res.json();
-    if(json.metadata) setSyncStatus('Saved ✓','var(--green)');
-    else setSyncStatus('Save failed','var(--red)');
+    if(json.metadata){
+      lastConfirmedCloudSyncAt=Date.now();
+      hasPendingLocalChanges=false;
+      setSyncStatus('Saved ✓','var(--green)');
+      setSyncWarning('');
+      updateSyncMeta();
+    } else {
+      setSyncStatus('Save failed','var(--red)');
+      updateSyncMeta();
+    }
     localStorage.setItem(LS_CACHE,JSON.stringify(data));
   } catch(e){
     setSyncStatus('Offline — saved locally','var(--gold)');
+    hasPendingLocalChanges=true;
+    updateSyncMeta();
     localStorage.setItem(LS_CACHE,JSON.stringify(data));
   }
 }
@@ -903,18 +952,27 @@ async function cloudLoad(){
         if(remoteData.updatedAt>=currentDataUpdatedAt){
           applyData(remoteData);
           localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
+          lastConfirmedCloudSyncAt=Date.now();
+          hasPendingLocalChanges=false;
           setSyncStatus('Synced ✓','var(--green)');
+          setSyncWarning('');
+          updateSyncMeta();
           return 'synced';
         }
         setSyncStatus('Local changes kept','var(--gold)');
+        setSyncWarning('This device kept newer local data and pushed it back to cloud. Refresh your other device before editing there.');
+        hasPendingLocalChanges=true;
+        updateSyncMeta();
         cloudSave(getDataSnapshot());
         return cachedData ? 'cached' : 'empty';
       }
     } catch(e){
       setSyncStatus('Offline — using cached data','var(--gold)');
+      updateSyncMeta();
     }
   } else {
     setSyncStatus('');
+    updateSyncMeta();
   }
   return cached ? 'cached' : 'empty';
 }
@@ -956,6 +1014,9 @@ function saveData(){
   const data=getDataSnapshot();
   // Always write to local cache immediately
   localStorage.setItem(LS_CACHE,JSON.stringify(data));
+  hasPendingLocalChanges=true;
+  setSyncWarning('');
+  updateSyncMeta();
   // Debounce cloud save by 1.5s to avoid hammering on rapid changes
   clearTimeout(syncTimeout);
   syncTimeout=setTimeout(()=>cloudSave(data),1500);

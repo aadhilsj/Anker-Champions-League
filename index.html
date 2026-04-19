@@ -887,7 +887,9 @@ function normaliseData(raw){
         ...p,
         team:p.team||'',
         seriesWins:typeof p.seriesWins==='number' ? p.seriesWins : 0,
-        baseSeriesWins:typeof p.baseSeriesWins==='number' ? p.baseSeriesWins : getLegacySeriesBaseline(p.name)
+        // Recompute the legacy baseline from the manager name so stale synced
+        // values cannot keep an incorrect series win alive forever.
+        baseSeriesWins:getLegacySeriesBaseline(p.name)
       }));
     }
   }
@@ -2159,17 +2161,20 @@ function backfillDates(){
   if(changed)saveData();
 }
 
-// One-time migration: set baseSeriesWins for James=1, Aadhil=1
-// These represent pre-logging history and never change
+// Normalize legacy baseline series wins from player names.
+// These represent pre-logging history and never change.
 function migrateBaseSeriesWins(){
-  if(localStorage.getItem('anker_base_series_v1'))return;
+  if(localStorage.getItem('anker_base_series_v2'))return;
+  let changed=false;
   players.forEach(p=>{
-    if(p.baseSeriesWins===undefined){
-      p.baseSeriesWins=getLegacySeriesBaseline(p.name);
+    const baseline=getLegacySeriesBaseline(p.name);
+    if(p.baseSeriesWins!==baseline){
+      p.baseSeriesWins=baseline;
+      changed=true;
     }
   });
-  saveData();
-  localStorage.setItem('anker_base_series_v1','1');
+  if(changed)saveData();
+  localStorage.setItem('anker_base_series_v2','1');
 }
 
 // Compute series wins dynamically: base offset + clinch matches won

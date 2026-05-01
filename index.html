@@ -918,6 +918,8 @@ const JSONBIN_KEY='$2a$10$WCsCgfcP.Q27Q1p2Acg6pe.sU2ckzmC29Qq/SY.GKfFIZTfd45wEy'
 const JSONBIN_URL='https://api.jsonbin.io/v3/b';
 const LS_BIN_KEY='anker_cl_bin_id';
 const LS_CACHE='anker_cl_cache';
+const LS_REVISIONS='anker_cl_revisions';
+const MAX_LOCAL_REVISIONS=25;
 const HARDCODED_BIN_ID='69d87cca36566621a898f51e';
 
 // Always use the hardcoded shared bin — this ensures all devices sync to the same data
@@ -960,6 +962,32 @@ function updateSyncMeta(){
   }
   el.textContent=formatSyncTime(lastConfirmedCloudSyncAt);
   el.style.color='var(--muted)';
+}
+
+function sameSnapshot(a,b){
+  return JSON.stringify(normaliseData(a))===JSON.stringify(normaliseData(b));
+}
+
+function saveRevision(reason,data){
+  try{
+    const snapshot=normaliseData(data);
+    const raw=localStorage.getItem(LS_REVISIONS);
+    let revisions=[];
+    if(raw){
+      try{revisions=JSON.parse(raw)||[];}catch(_){}
+    }
+    const last=revisions[revisions.length-1];
+    if(last&&sameSnapshot(last.data,snapshot))return;
+    revisions.push({
+      savedAt:Date.now(),
+      reason,
+      data:snapshot
+    });
+    if(revisions.length>MAX_LOCAL_REVISIONS){
+      revisions=revisions.slice(-MAX_LOCAL_REVISIONS);
+    }
+    localStorage.setItem(LS_REVISIONS,JSON.stringify(revisions));
+  } catch(_){}
 }
 
 function getLegacySeriesBaseline(name){
@@ -1056,9 +1084,20 @@ async function cloudLoad(){
       const json=await res.json();
       if(json.record){
         const remoteData=normaliseData(json.record);
-        // The shared JSONBin record is the canonical league state.
-        // Always prefer it when reachable so stale local cache cannot
-        // keep phantom stats alive on a single device.
+        if(cachedData&&cachedData.updatedAt>remoteData.updatedAt){
+          saveRevision('newer-local-kept',cachedData);
+          applyData(cachedData);
+          localStorage.setItem(LS_CACHE,JSON.stringify(cachedData));
+          hasPendingLocalChanges=true;
+          setSyncStatus('Local newer — restoring','var(--gold)');
+          setSyncWarning('A newer local snapshot was kept and is being pushed back to cloud.');
+          updateSyncMeta();
+          cloudSave(cachedData);
+          return 'restored-local';
+        }
+        if(cachedData&&!sameSnapshot(cachedData,remoteData)){
+          saveRevision('pre-remote-replace',cachedData);
+        }
         applyData(remoteData);
         localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
         lastConfirmedCloudSyncAt=Date.now();
@@ -1118,6 +1157,7 @@ function saveData(){
   const data=getDataSnapshot();
   // Always write to local cache immediately
   localStorage.setItem(LS_CACHE,JSON.stringify(data));
+  saveRevision('local-save',data);
   hasPendingLocalChanges=true;
   setSyncWarning('');
   updateSyncMeta();
@@ -1228,12 +1268,11 @@ function importPastedData(){
   const raw=document.getElementById('import-input').value.trim();
   if(!raw)return alert('Nothing to import — paste your data first.');
   try{
-    const d=JSON.parse(raw);
+    const d=normaliseData(JSON.parse(raw));
     if(!d.players||!d.matches)return alert('Invalid data — make sure you copied the full export.');
-    players=d.players;
-    matches=d.matches;
-    saveData();
+    applyData(d);
     backfillDates();
+    saveData();
     document.getElementById('import-panel').style.display='none';
     launchApp();
   } catch(err){
@@ -1248,6 +1287,7 @@ function resetSession(){
   if(!confirm('Reset everything? Clears all data.'))return;
   localStorage.removeItem(LS_CACHE);
   localStorage.removeItem(LS_BIN_KEY);
+  localStorage.removeItem(LS_REVISIONS);
   localStorage.removeItem('fc24_session');
   location.reload();
 }

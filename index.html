@@ -840,6 +840,18 @@ function parseDateISO(dateISO){
   return new Date(y,m-1,d,12);
 }
 
+function shiftDateISO(dateISO, days){
+  const [y,m,d]=dateISO.split('-').map(Number);
+  const shifted=new Date(Date.UTC(y,m-1,d)+days*86400000);
+  return shifted.toISOString().slice(0,10);
+}
+
+function getDisplayHourMinute(displayDate){
+  const m=(displayDate||'').match(/(\d{2}):(\d{2})$/);
+  if(!m)return null;
+  return {hour:Number(m[1]),minute:Number(m[2])};
+}
+
 function getLeagueNowDate(){
   return parseDateISO(getLeagueDateISO());
 }
@@ -2208,6 +2220,25 @@ function backfillDates(){
   if(changed)saveData();
 }
 
+function migrateLeagueRolloverDates(){
+  if(localStorage.getItem('anker_league_rollover_v1'))return;
+  let changed=false;
+  matches.forEach(m=>{
+    if(!m.dateISO||!m.date)return;
+    const hm=getDisplayHourMinute(m.date);
+    if(!hm||hm.hour>=LEAGUE_DAY_ROLLOVER_HOUR)return;
+    const displayDay=(m.date.match(/^(\d{2})/)||[])[1];
+    if(!displayDay)return;
+    const isoDay=m.dateISO.slice(8,10);
+    if(displayDay===isoDay){
+      m.dateISO=shiftDateISO(m.dateISO,-1);
+      changed=true;
+    }
+  });
+  if(changed)saveData();
+  localStorage.setItem('anker_league_rollover_v1','1');
+}
+
 // Normalize legacy baseline series wins from player names.
 // These represent pre-logging history and never change.
 function migrateBaseSeriesWins(){
@@ -2276,6 +2307,7 @@ function getMonthsWon(){
   } else if(localResult===true&&players.length===3){
     backfillDates();
     migrateBaseSeriesWins();
+    migrateLeagueRolloverDates();
     launchApp();
   }
   // Always try to sync from cloud (updates UI if newer data found)
@@ -2283,6 +2315,7 @@ function getMonthsWon(){
   if(cloudResult==='synced'&&players.length===3){
     backfillDates();
     migrateBaseSeriesWins();
+    migrateLeagueRolloverDates();
     launchApp();
   } else if(cloudResult==='empty'&&!localResult){
     document.getElementById('setup-screen').style.display='block';

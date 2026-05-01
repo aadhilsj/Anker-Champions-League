@@ -713,6 +713,10 @@
         <div class="field-wrap"><label class="field-label">To</label><input type="date" id="range-to"/></div>
         <button class="btn secondary sm" style="align-self:flex-end" onclick="renderMonthly()">Apply</button>
       </div>
+      <div class="field-wrap">
+        <label class="field-label">Month Control</label>
+        <button class="btn secondary sm" onclick="closeCurrentMonth()">Close Current Month</button>
+      </div>
     </div>
     <div class="section-title" id="monthly-period-label"></div>
     <div class="monthly-podium" id="monthly-podium"></div>
@@ -795,6 +799,7 @@ let currentMatchType='normal', editMatchType='normal', editingMatchId=null;
 let mgrSort={col:'goals', dir:'desc'};
 let plyrSort={col:'goals', dir:'desc'};
 let plyrView='overview'; // 'overview' | 'types'
+let manualActiveMonthKey='';
 const LEAGUE_TIME_ZONE='Europe/Oslo';
 const LEAGUE_DAY_ROLLOVER_HOUR=7;
 
@@ -854,6 +859,41 @@ function getDisplayHourMinute(displayDate){
 
 function getLeagueNowDate(){
   return parseDateISO(getLeagueDateISO());
+}
+
+function getMonthKeyFromDateISO(dateISO){
+  return (dateISO||'').slice(0,7);
+}
+
+function nextMonthKey(monthKey){
+  const [y,m]=monthKey.split('-').map(Number);
+  const d=new Date(y,m,1);
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}`;
+}
+
+function compareMonthKeys(a,b){
+  return String(a).localeCompare(String(b));
+}
+
+function getAutomaticLeagueMonthKey(){
+  return getMonthKeyFromDateISO(getLeagueDateISO());
+}
+
+function getCurrentLeagueMonthKey(){
+  const automatic=getAutomaticLeagueMonthKey();
+  if(manualActiveMonthKey&&compareMonthKeys(manualActiveMonthKey,automatic)>0){
+    return manualActiveMonthKey;
+  }
+  return automatic;
+}
+
+function getMatchMonthKey(m){
+  return m.monthKey||getMonthKeyFromDateISO(m.dateISO);
+}
+
+function formatMonthKeyLabel(monthKey){
+  const [y,m]=monthKey.split('-').map(Number);
+  return new Date(y,m-1,1).toLocaleString('en-GB',{month:'long',year:'numeric'}).toUpperCase();
 }
 
 function setPlyrView(view){
@@ -934,7 +974,8 @@ function normaliseData(raw){
   const d=raw||{};
   const nextMatches=(d.matches||[]).map(m=>({
     ...m,
-    seriesClinch:!!m.seriesClinch
+    seriesClinch:!!m.seriesClinch,
+    monthKey:m.monthKey||getMonthKeyFromDateISO(m.dateISO)
   }));
   let nextPlayers=[];
   if(Array.isArray(d.players)&&d.players.length===3){
@@ -959,12 +1000,13 @@ function normaliseData(raw){
   return {
     players:nextPlayers,
     matches:nextMatches,
-    updatedAt:Number(d.updatedAt)||0
+    updatedAt:Number(d.updatedAt)||0,
+    manualActiveMonthKey:/^\d{4}-\d{2}$/.test(d.manualActiveMonthKey||'') ? d.manualActiveMonthKey : ''
   };
 }
 
 function getDataSnapshot(){
-  return {players,matches,updatedAt:currentDataUpdatedAt||Date.now()};
+  return {players,matches,manualActiveMonthKey,updatedAt:currentDataUpdatedAt||Date.now()};
 }
 
 async function cloudSave(data){
@@ -1042,6 +1084,7 @@ function applyData(d){
   matches=data.matches||[];
   if(!data.players||data.players.length!==3) return;
   players=data.players;
+  manualActiveMonthKey=data.manualActiveMonthKey||'';
   currentDataUpdatedAt=data.updatedAt||Date.now();
 }
 
@@ -1059,6 +1102,7 @@ function loadData(){
   const raw=JSON.parse(cached);
   const d=normaliseData(raw);
   matches=d.matches||[];
+  manualActiveMonthKey=d.manualActiveMonthKey||'';
   currentDataUpdatedAt=d.updatedAt||Date.now();
   if(!d.players||d.players.length!==3)return false;
   if(typeof raw.players?.[0]==='string'){
@@ -1570,6 +1614,7 @@ function logGame(){
   matches.push({id:Date.now(),
     date:new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:LEAGUE_TIME_ZONE}),
     dateISO:getLeagueDateISO(),
+    monthKey:getCurrentLeagueMonthKey(),
     home:hi,away:ai,hg,ag,matchType:currentMatchType,penWinner,scorers,dnps,
     seriesClinch});
   saveData();
@@ -1803,6 +1848,16 @@ function setMonthlyMode(mode){
   renderMonthly();
 }
 
+function closeCurrentMonth(){
+  const currentMonthKey=getCurrentLeagueMonthKey();
+  const nextKey=nextMonthKey(currentMonthKey);
+  const label=formatMonthKeyLabel(currentMonthKey);
+  if(!confirm(`Close ${label} now and start counting new games toward ${formatMonthKeyLabel(nextKey)}?`))return;
+  manualActiveMonthKey=nextKey;
+  saveData();
+  renderMonthly();
+}
+
 function parseMatchDate(m){
   // Use dateISO if stored, else try to parse the display date
   if(m.dateISO)return parseDateISO(m.dateISO);
@@ -1813,11 +1868,9 @@ function parseMatchDate(m){
 function renderMonthly(){
   let subset,label;
   if(monthlyMode==='current'){
-    const now=getLeagueNowDate();
-    const y=now.getFullYear(),mo=now.getMonth();
-    const start=new Date(y,mo,1),end=new Date(y,mo+1,0,23,59,59);
-    subset=matches.filter(m=>{const d=parseMatchDate(m);return d>=start&&d<=end;});
-    label=now.toLocaleString('en-GB',{month:'long',year:'numeric'}).toUpperCase();
+    const activeMonthKey=getCurrentLeagueMonthKey();
+    subset=matches.filter(m=>getMatchMonthKey(m)===activeMonthKey);
+    label=formatMonthKeyLabel(activeMonthKey);
   } else {
     const from=document.getElementById('range-from').value;
     const to=document.getElementById('range-to').value;
@@ -2216,7 +2269,16 @@ function renderScorers(){
 /* ── INIT ── */
 function backfillDates(){
   let changed=false;
-  matches.forEach(m=>{if(!m.dateISO){m.dateISO=getLeagueDateISO();changed=true;}});
+  matches.forEach(m=>{
+    if(!m.dateISO){
+      m.dateISO=getLeagueDateISO();
+      changed=true;
+    }
+    if(!m.monthKey){
+      m.monthKey=getMonthKeyFromDateISO(m.dateISO);
+      changed=true;
+    }
+  });
   if(changed)saveData();
 }
 
@@ -2232,11 +2294,23 @@ function migrateLeagueRolloverDates(){
     const isoDay=m.dateISO.slice(8,10);
     if(displayDay===isoDay){
       m.dateISO=shiftDateISO(m.dateISO,-1);
+      if(!m.monthKey||m.monthKey===getMonthKeyFromDateISO(shiftDateISO(m.dateISO,1))){
+        m.monthKey=getMonthKeyFromDateISO(m.dateISO);
+      }
       changed=true;
     }
   });
   if(changed)saveData();
   localStorage.setItem('anker_league_rollover_v1','1');
+}
+
+function clearExpiredMonthOverride(){
+  if(!manualActiveMonthKey)return;
+  const automaticMonthKey=getAutomaticLeagueMonthKey();
+  if(compareMonthKeys(manualActiveMonthKey,automaticMonthKey)<=0){
+    manualActiveMonthKey='';
+    saveData();
+  }
 }
 
 // Normalize legacy baseline series wins from player names.
@@ -2268,26 +2342,17 @@ function getSeriesWins(playerIdx){
 
 // Months Won: count completed past months where a player led on points (no ties)
 function getMonthsWon(){
-  const now=getLeagueNowDate();
-  const curYM=now.getFullYear()*100+now.getMonth();
+  const currentMonthKey=getCurrentLeagueMonthKey();
   // Gather all unique YYYY-MM keys from matches, excluding current month
   const monthKeys=new Set();
   matches.forEach(m=>{
-    if(!m.dateISO)return;
-    const d=parseDateISO(m.dateISO);
-    const ym=d.getFullYear()*100+d.getMonth();
-    if(ym<curYM)monthKeys.add(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+    const monthKey=getMatchMonthKey(m);
+    if(monthKey&&compareMonthKeys(monthKey,currentMonthKey)<0)monthKeys.add(monthKey);
   });
   // For each month, compute standings and find winner (no award on tie)
   const wins=players.map(()=>0);
   monthKeys.forEach(key=>{
-    const [y,mo]=key.split('-').map(Number);
-    const start=new Date(y,mo-1,1),end=new Date(y,mo,0,23,59,59);
-    const subset=matches.filter(m=>{
-      if(!m.dateISO)return false;
-      const d=parseDateISO(m.dateISO);
-      return d>=start&&d<=end;
-    });
+    const subset=matches.filter(m=>getMatchMonthKey(m)===key);
     if(!subset.length)return;
     const stats=getStats(subset);
     // stats sorted by pts desc; check for tie at top
@@ -2308,6 +2373,7 @@ function getMonthsWon(){
     backfillDates();
     migrateBaseSeriesWins();
     migrateLeagueRolloverDates();
+    clearExpiredMonthOverride();
     launchApp();
   }
   // Always try to sync from cloud (updates UI if newer data found)
@@ -2316,6 +2382,7 @@ function getMonthsWon(){
     backfillDates();
     migrateBaseSeriesWins();
     migrateLeagueRolloverDates();
+    clearExpiredMonthOverride();
     launchApp();
   } else if(cloudResult==='empty'&&!localResult){
     document.getElementById('setup-screen').style.display='block';

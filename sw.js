@@ -1,4 +1,4 @@
-const CACHE_VERSION='acl-pwa-v3';
+const CACHE_VERSION='acl-pwa-v5';
 const APP_SHELL=[
   '/',
   '/index.html',

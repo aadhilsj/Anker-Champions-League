@@ -913,18 +913,15 @@ function getKnownNames(){
   return [...s].sort();
 }
 
-/* ── CLOUD SYNC (JSONBin) ── */
-const JSONBIN_KEY='$2a$10$WCsCgfcP.Q27Q1p2Acg6pe.sU2ckzmC29Qq/SY.GKfFIZTfd45wEy';
-const JSONBIN_URL='https://api.jsonbin.io/v3/b';
-const LS_BIN_KEY='anker_cl_bin_id';
+/* ── CLOUD SYNC (Supabase) ── */
+const SUPABASE_PROJECT_REF='hkryajdsiwvkmtvibkbz';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_JgGX-OUca_cgp1JhWxihrQ_xaZeXoMt';
+const SUPABASE_REST_URL='https://'+SUPABASE_PROJECT_REF+'.supabase.co/rest/v1';
+const LEAGUE_SLUG='anker-champions-league';
 const LS_CACHE='anker_cl_cache';
 const LS_REVISIONS='anker_cl_revisions';
+const LS_DIRTY='anker_cl_dirty';
 const MAX_LOCAL_REVISIONS=25;
-const HARDCODED_BIN_ID='69d87cca36566621a898f51e';
-
-// Always use the hardcoded shared bin — this ensures all devices sync to the same data
-let binId=HARDCODED_BIN_ID;
-localStorage.setItem(LS_BIN_KEY, HARDCODED_BIN_ID);
 let syncTimeout=null;
 let currentDataUpdatedAt=0;
 let lastConfirmedCloudSyncAt=0;
@@ -1040,6 +1037,15 @@ function getDataSnapshot(){
   return {players,matches,manualActiveMonthKey,updatedAt:currentDataUpdatedAt||Date.now()};
 }
 
+function getIsDirty(){
+  return localStorage.getItem(LS_DIRTY)==='1';
+}
+
+function setIsDirty(value){
+  if(value)localStorage.setItem(LS_DIRTY,'1');
+  else localStorage.removeItem(LS_DIRTY);
+}
+
 function sortMatchesChronologically(list){
   return [...list].sort((a,b)=>(Number(a.id)||0)-(Number(b.id)||0));
 }
@@ -1085,22 +1091,329 @@ function finishBootHydration(commitToCloud=false){
   localStorage.setItem(LS_CACHE,JSON.stringify(getDataSnapshot()));
 }
 
+function stableIdFromString(input){
+  let h1=0x811c9dc5,h2=0x01000193;
+  for(let i=0;i<input.length;i++){
+    const c=input.charCodeAt(i);
+    h1^=c; h1=Math.imul(h1,0x01000193);
+    h2^=(c<<1); h2=Math.imul(h2,0x01000193);
+  }
+  const hex=n=>((n>>>0).toString(16).padStart(8,'0'));
+  const raw=(hex(h1)+hex(h2)+hex(h1^h2)+hex(h1+h2)).slice(0,32);
+  return [
+    raw.slice(0,8),
+    raw.slice(8,12),
+    '4'+raw.slice(13,16),
+    'a'+raw.slice(17,20),
+    raw.slice(20,32)
+  ].join('-');
+}
+
+function getManagerStableId(player){
+  return stableIdFromString('manager:'+player.name);
+}
+
+function buildSupabaseSnapshotRows(data, leagueRow, managerRows, matchIdByLegacyId){
+  const leagueId=leagueRow.id;
+  const managerRowsOut=data.players.map((player,index)=>({
+    id:getManagerStableId(player),
+    league_id:leagueId,
+    name:player.name,
+    team:player.team||'',
+    base_series_wins:getLegacySeriesBaseline(player.name),
+    sort_order:index
+  }));
+
+  const managerIdByIdx=new Map(managerRowsOut.map((manager,index)=>[index,manager.id]));
+  const matchRows=data.matches.map(match=>({
+    league_id:leagueId,
+    legacy_client_id:Number(match.id),
+    display_date:match.date||'',
+    league_date_iso:match.dateISO,
+    month_key:match.monthKey||getMonthKeyFromDateISO(match.dateISO),
+    home_manager_id:managerIdByIdx.get(Number(match.home)),
+    away_manager_id:managerIdByIdx.get(Number(match.away)),
+    home_goals:Number(match.hg)||0,
+    away_goals:Number(match.ag)||0,
+    match_type:match.matchType||'normal',
+    pen_winner_manager_id:match.penWinner===null||match.penWinner===undefined
+      ? null
+      : managerIdByIdx.get(Number(match.penWinner))||null,
+    series_clinch:!!match.seriesClinch
+  }));
+
+  const scorerRows=[];
+  const dnpRows=[];
+  data.matches.forEach(match=>{
+    const matchId=matchIdByLegacyId.get(String(match.id));
+    if(!matchId)return;
+    (match.scorers||[]).forEach((scorer,index)=>{
+      scorerRows.push({
+        id:stableIdFromString('match-scorer:'+match.id+':'+index+':'+(scorer.name||'')+':'+(scorer.team||'')),
+        match_id:matchId,
+        player_name:scorer.name,
+        team_name:scorer.team,
+        goals:Number(scorer.goals)||0,
+        headers:Number(scorer.headers)||0,
+        free_kicks:Number(scorer.fk)||0,
+        long_shots:Number(scorer.ls)||0,
+        penalties:Number(scorer.pen)||0,
+        assists:Number(scorer.assists)||0
+      });
+    });
+    (match.dnps||[]).forEach((dnp,index)=>{
+      const managerId=managerIdByIdx.get(Number(dnp.managerIdx));
+      if(!managerId)return;
+      dnpRows.push({
+        id:stableIdFromString('match-dnp:'+match.id+':'+index+':'+(dnp.name||'')),
+        match_id:matchId,
+        manager_id:managerId,
+        player_name:dnp.name
+      });
+    });
+  });
+
+  return {managerRows:managerRowsOut,matchRows,scorerRows,dnpRows};
+}
+
+async function supabaseFetch(path, options={}){
+  const {method='GET', body=null, prefer='', noContentOk=false}=options;
+  const headers={
+    'apikey':SUPABASE_PUBLISHABLE_KEY,
+    'Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY
+  };
+  if(body!==null)headers['Content-Type']='application/json';
+  if(prefer)headers['Prefer']=prefer;
+  const res=await fetch(SUPABASE_REST_URL+path,{
+    method,
+    headers,
+    body:body===null?undefined:JSON.stringify(body)
+  });
+  if(!res.ok){
+    const text=await res.text();
+    throw new Error('Supabase '+method+' '+path+' failed: '+res.status+' '+text);
+  }
+  if(noContentOk||res.status===204)return null;
+  const text=await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function fetchLeagueRow(){
+  const rows=await supabaseFetch('/leagues?slug=eq.'+encodeURIComponent(LEAGUE_SLUG)+'&select=*');
+  return rows&&rows[0] ? rows[0] : null;
+}
+
+async function fetchRemoteSnapshot(){
+  const league=await fetchLeagueRow();
+  if(!league)return null;
+
+  const managerRows=await supabaseFetch('/managers?league_id=eq.'+league.id+'&select=*&order=sort_order.asc');
+  const matchRows=await supabaseFetch('/matches?league_id=eq.'+league.id+'&select=*&order=legacy_client_id.asc');
+  const matchIds=matchRows.map(match=>match.id);
+  let scorerRows=[];
+  let dnpRows=[];
+  if(matchIds.length){
+    const idList='('+matchIds.map(id=>'"'+id+'"').join(',')+')';
+    scorerRows=await supabaseFetch('/match_scorers?match_id=in.'+idList+'&select=*');
+    dnpRows=await supabaseFetch('/match_dnps?match_id=in.'+idList+'&select=*');
+  }
+
+  const managerIndexById=new Map(managerRows.map((manager,index)=>[manager.id,index]));
+  const scorerRowsByMatchId=new Map();
+  scorerRows.forEach(row=>{
+    if(!scorerRowsByMatchId.has(row.match_id))scorerRowsByMatchId.set(row.match_id,[]);
+    scorerRowsByMatchId.get(row.match_id).push(row);
+  });
+  const dnpRowsByMatchId=new Map();
+  dnpRows.forEach(row=>{
+    if(!dnpRowsByMatchId.has(row.match_id))dnpRowsByMatchId.set(row.match_id,[]);
+    dnpRowsByMatchId.get(row.match_id).push(row);
+  });
+
+  return normaliseData({
+    players:managerRows.map(manager=>({
+      name:manager.name,
+      team:manager.team||'',
+      seriesWins:getLegacySeriesBaseline(manager.name),
+      baseSeriesWins:manager.base_series_wins||0
+    })),
+    matches:matchRows.map(match=>({
+      id:Number(match.legacy_client_id),
+      date:match.display_date,
+      dateISO:String(match.league_date_iso),
+      monthKey:match.month_key,
+      home:managerIndexById.get(match.home_manager_id),
+      away:managerIndexById.get(match.away_manager_id),
+      hg:match.home_goals,
+      ag:match.away_goals,
+      matchType:match.match_type||'normal',
+      penWinner:match.pen_winner_manager_id ? managerIndexById.get(match.pen_winner_manager_id) : null,
+      seriesClinch:!!match.series_clinch,
+      scorers:(scorerRowsByMatchId.get(match.id)||[]).map(row=>({
+        name:row.player_name,
+        team:row.team_name,
+        goals:row.goals,
+        headers:row.headers,
+        fk:row.free_kicks,
+        ls:row.long_shots,
+        pen:row.penalties,
+        assists:row.assists
+      })),
+      dnps:(dnpRowsByMatchId.get(match.id)||[]).map(row=>({
+        name:row.player_name,
+        managerIdx:managerIndexById.get(row.manager_id)
+      }))
+    })),
+    manualActiveMonthKey:league.manual_active_month_key||'',
+    updatedAt:Date.parse(league.updated_at)||0
+  });
+}
+
+async function saveRemoteSnapshot(data){
+  const outbound=normaliseData(data);
+  const leagueUpsert=await supabaseFetch('/leagues?on_conflict=slug',{
+    method:'POST',
+    body:[{
+      slug:LEAGUE_SLUG,
+      name:'Anker Champions League',
+      manual_active_month_key:outbound.manualActiveMonthKey||null
+    }],
+    prefer:'resolution=merge-duplicates,return=representation'
+  });
+  const league=leagueUpsert&&leagueUpsert[0] ? leagueUpsert[0] : await fetchLeagueRow();
+  if(!league)throw new Error('League row missing after upsert');
+
+  const managerSeed=outbound.players.map((player,index)=>({
+    id:getManagerStableId(player),
+    league_id:league.id,
+    name:player.name,
+    team:player.team||'',
+    base_series_wins:getLegacySeriesBaseline(player.name),
+    sort_order:index
+  }));
+  await supabaseFetch('/managers?on_conflict=league_id,name',{
+    method:'POST',
+    body:managerSeed,
+    prefer:'resolution=merge-duplicates,return=minimal'
+  });
+  const managerRows=await supabaseFetch('/managers?league_id=eq.'+league.id+'&select=*&order=sort_order.asc');
+  const managerIdByIdx=new Map(managerRows.map((manager,index)=>[index,manager.id]));
+
+  const matchPayload=outbound.matches.map(match=>({
+    league_id:league.id,
+    legacy_client_id:Number(match.id),
+    display_date:match.date||'',
+    league_date_iso:match.dateISO,
+    month_key:match.monthKey||getMonthKeyFromDateISO(match.dateISO),
+    home_manager_id:managerIdByIdx.get(Number(match.home)),
+    away_manager_id:managerIdByIdx.get(Number(match.away)),
+    home_goals:Number(match.hg)||0,
+    away_goals:Number(match.ag)||0,
+    match_type:match.matchType||'normal',
+    pen_winner_manager_id:match.penWinner===null||match.penWinner===undefined
+      ? null
+      : managerIdByIdx.get(Number(match.penWinner))||null,
+    series_clinch:!!match.seriesClinch
+  }));
+
+  if(matchPayload.length){
+    await supabaseFetch('/matches?on_conflict=league_id,legacy_client_id',{
+      method:'POST',
+      body:matchPayload,
+      prefer:'resolution=merge-duplicates,return=minimal'
+    });
+  }
+
+  const remoteMatches=await supabaseFetch('/matches?league_id=eq.'+league.id+'&select=id,legacy_client_id');
+  const wantedMatchIds=new Set(outbound.matches.map(match=>String(match.id)));
+  const obsoleteIds=remoteMatches.filter(match=>!wantedMatchIds.has(String(match.legacy_client_id))).map(match=>match.id);
+  if(obsoleteIds.length){
+    const obsoleteList='('+obsoleteIds.map(id=>'"'+id+'"').join(',')+')';
+    await supabaseFetch('/matches?id=in.'+obsoleteList,{
+      method:'DELETE',
+      prefer:'return=minimal',
+      noContentOk:true
+    });
+  }
+
+  const currentMatches=await supabaseFetch('/matches?league_id=eq.'+league.id+'&select=id,legacy_client_id&order=legacy_client_id.asc');
+  const matchIdByLegacyId=new Map(currentMatches.map(match=>[String(match.legacy_client_id),match.id]));
+  const currentMatchIds=currentMatches.map(match=>match.id);
+  if(currentMatchIds.length){
+    const matchIdList='('+currentMatchIds.map(id=>'"'+id+'"').join(',')+')';
+    await supabaseFetch('/match_scorers?match_id=in.'+matchIdList,{
+      method:'DELETE',
+      prefer:'return=minimal',
+      noContentOk:true
+    });
+    await supabaseFetch('/match_dnps?match_id=in.'+matchIdList,{
+      method:'DELETE',
+      prefer:'return=minimal',
+      noContentOk:true
+    });
+  }
+
+  const scorerPayload=[];
+  const dnpPayload=[];
+  outbound.matches.forEach(match=>{
+    const matchId=matchIdByLegacyId.get(String(match.id));
+    if(!matchId)return;
+    (match.scorers||[]).forEach((scorer,index)=>{
+      scorerPayload.push({
+        id:stableIdFromString('match-scorer:'+match.id+':'+index+':'+(scorer.name||'')+':'+(scorer.team||'')),
+        match_id:matchId,
+        player_name:scorer.name,
+        team_name:scorer.team,
+        goals:Number(scorer.goals)||0,
+        headers:Number(scorer.headers)||0,
+        free_kicks:Number(scorer.fk)||0,
+        long_shots:Number(scorer.ls)||0,
+        penalties:Number(scorer.pen)||0,
+        assists:Number(scorer.assists)||0
+      });
+    });
+    (match.dnps||[]).forEach((dnp,index)=>{
+      const managerId=managerIdByIdx.get(Number(dnp.managerIdx));
+      if(!managerId)return;
+      dnpPayload.push({
+        id:stableIdFromString('match-dnp:'+match.id+':'+index+':'+(dnp.name||'')),
+        match_id:matchId,
+        manager_id:managerId,
+        player_name:dnp.name
+      });
+    });
+  });
+  if(scorerPayload.length){
+    await supabaseFetch('/match_scorers?on_conflict=id',{
+      method:'POST',
+      body:scorerPayload,
+      prefer:'resolution=merge-duplicates,return=minimal'
+    });
+  }
+  if(dnpPayload.length){
+    await supabaseFetch('/match_dnps?on_conflict=id',{
+      method:'POST',
+      body:dnpPayload,
+      prefer:'resolution=merge-duplicates,return=minimal'
+    });
+  }
+
+  return fetchRemoteSnapshot();
+}
+
 async function cloudSave(data){
   setSyncStatus('Saving…');
   let outbound=normaliseData(data);
   try{
-    const latestRes=await fetch(JSONBIN_URL+'/'+binId+'/latest',{
-      headers:{'X-Access-Key':JSONBIN_KEY}
-    });
-    const latestJson=await latestRes.json();
-    if(latestJson.record){
-      const remoteData=normaliseData(latestJson.record);
+    const remoteData=await fetchRemoteSnapshot();
+    if(remoteData){
       lastLoadedCloudUpdatedAt=Math.max(lastLoadedCloudUpdatedAt,remoteData.updatedAt||0);
       if(sameSnapshot(remoteData,outbound)){
         applyData(remoteData);
         localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
         lastConfirmedCloudSyncAt=Date.now();
         hasPendingLocalChanges=false;
+        setIsDirty(false);
         setSyncStatus('Synced ✓','var(--green)');
         setSyncWarning('');
         updateSyncMeta();
@@ -1129,29 +1442,22 @@ async function cloudSave(data){
       currentDataUpdatedAt=outbound.updatedAt;
     }
 
-    const body=JSON.stringify(outbound);
-    const res=await fetch(JSONBIN_URL+'/'+binId,{
-      method:'PUT',
-      headers:{'Content-Type':'application/json','X-Access-Key':JSONBIN_KEY},
-      body
-    });
-    const json=await res.json();
-    if(json.metadata){
-      applyData(outbound);
-      lastLoadedCloudUpdatedAt=outbound.updatedAt||lastLoadedCloudUpdatedAt;
+    const savedRemote=await saveRemoteSnapshot(outbound);
+    if(savedRemote){
+      applyData(savedRemote);
+      lastLoadedCloudUpdatedAt=savedRemote.updatedAt||lastLoadedCloudUpdatedAt;
       lastConfirmedCloudSyncAt=Date.now();
       hasPendingLocalChanges=false;
+      setIsDirty(false);
       setSyncStatus('Saved ✓','var(--green)');
       setSyncWarning('');
       updateSyncMeta();
-    } else {
-      setSyncStatus('Save failed','var(--red)');
-      updateSyncMeta();
     }
-    localStorage.setItem(LS_CACHE,JSON.stringify(outbound));
+    localStorage.setItem(LS_CACHE,JSON.stringify(savedRemote||outbound));
   } catch(e){
     setSyncStatus('Offline — saved locally','var(--gold)');
     hasPendingLocalChanges=true;
+    setIsDirty(true);
     updateSyncMeta();
     localStorage.setItem(LS_CACHE,JSON.stringify(outbound||data));
   }
@@ -1166,45 +1472,38 @@ async function cloudLoad(){
     cachedData=normaliseData(JSON.parse(cached));
     applyData(cachedData);
   }
-  // If we have a bin ID, fetch fresh data from cloud
-  if(binId){
-    try{
-      const res=await fetch(JSONBIN_URL+'/'+binId+'/latest',{
-        headers:{'X-Access-Key':JSONBIN_KEY}
-      });
-      const json=await res.json();
-      if(json.record){
-        const remoteData=normaliseData(json.record);
-        if(cachedData&&cachedData.updatedAt>remoteData.updatedAt){
-          saveRevision('newer-local-kept',cachedData);
-          applyData(cachedData);
-          localStorage.setItem(LS_CACHE,JSON.stringify(cachedData));
-          hasPendingLocalChanges=true;
-          setSyncStatus('Local newer — restoring','var(--gold)');
-          setSyncWarning('A newer local snapshot was kept and is being pushed back to cloud.');
-          updateSyncMeta();
-          cloudSave(cachedData);
-          return 'restored-local';
-        }
-        if(cachedData&&!sameSnapshot(cachedData,remoteData)){
-          saveRevision('pre-remote-replace',cachedData);
-        }
-        applyData(remoteData);
-        localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
-        lastLoadedCloudUpdatedAt=remoteData.updatedAt||0;
-        lastConfirmedCloudSyncAt=Date.now();
-        hasPendingLocalChanges=false;
-        setSyncStatus('Synced ✓','var(--green)');
-        setSyncWarning('');
+
+  try{
+    const remoteData=await fetchRemoteSnapshot();
+    if(remoteData){
+      const dirty=getIsDirty();
+      if(dirty&&cachedData&&!sameSnapshot(cachedData,remoteData)){
+        saveRevision('newer-local-kept',cachedData);
+        applyData(cachedData);
+        localStorage.setItem(LS_CACHE,JSON.stringify(cachedData));
+        hasPendingLocalChanges=true;
+        setSyncStatus('Local newer — restoring','var(--gold)');
+        setSyncWarning('Unsynced local changes were kept and are being pushed back to cloud.');
         updateSyncMeta();
-        return 'synced';
+        cloudSave(cachedData);
+        return 'restored-local';
       }
-    } catch(e){
-      setSyncStatus('Offline — using cached data','var(--gold)');
+      if(cachedData&&!sameSnapshot(cachedData,remoteData)){
+        saveRevision('pre-remote-replace',cachedData);
+      }
+      applyData(remoteData);
+      localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
+      lastLoadedCloudUpdatedAt=remoteData.updatedAt||0;
+      lastConfirmedCloudSyncAt=Date.now();
+      hasPendingLocalChanges=false;
+      setIsDirty(false);
+      setSyncStatus('Synced ✓','var(--green)');
+      setSyncWarning('');
       updateSyncMeta();
+      return 'synced';
     }
-  } else {
-    setSyncStatus('');
+  } catch(e){
+    setSyncStatus(cached ? 'Offline — using cached data' : 'Offline','var(--gold)');
     updateSyncMeta();
   }
   return cached ? 'cached' : 'empty';
@@ -1256,6 +1555,7 @@ function saveData(){
   localStorage.setItem(LS_CACHE,JSON.stringify(data));
   saveRevision('local-save',data);
   hasPendingLocalChanges=true;
+  setIsDirty(true);
   setSyncWarning('');
   updateSyncMeta();
   // Debounce cloud save by 1.5s to avoid hammering on rapid changes
@@ -1383,8 +1683,8 @@ function importData(){showImportPanel();}
 function resetSession(){
   if(!confirm('Reset everything? Clears all data.'))return;
   localStorage.removeItem(LS_CACHE);
-  localStorage.removeItem(LS_BIN_KEY);
   localStorage.removeItem(LS_REVISIONS);
+  localStorage.removeItem(LS_DIRTY);
   localStorage.removeItem('fc24_session');
   location.reload();
 }

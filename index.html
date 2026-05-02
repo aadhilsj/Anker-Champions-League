@@ -1091,91 +1091,6 @@ function finishBootHydration(commitToCloud=false){
   localStorage.setItem(LS_CACHE,JSON.stringify(getDataSnapshot()));
 }
 
-function stableIdFromString(input){
-  let h1=0x811c9dc5,h2=0x01000193;
-  for(let i=0;i<input.length;i++){
-    const c=input.charCodeAt(i);
-    h1^=c; h1=Math.imul(h1,0x01000193);
-    h2^=(c<<1); h2=Math.imul(h2,0x01000193);
-  }
-  const hex=n=>((n>>>0).toString(16).padStart(8,'0'));
-  const raw=(hex(h1)+hex(h2)+hex(h1^h2)+hex(h1+h2)).slice(0,32);
-  return [
-    raw.slice(0,8),
-    raw.slice(8,12),
-    '4'+raw.slice(13,16),
-    'a'+raw.slice(17,20),
-    raw.slice(20,32)
-  ].join('-');
-}
-
-function getManagerStableId(player){
-  return stableIdFromString('manager:'+player.name);
-}
-
-function buildSupabaseSnapshotRows(data, leagueRow, managerRows, matchIdByLegacyId){
-  const leagueId=leagueRow.id;
-  const managerRowsOut=data.players.map((player,index)=>({
-    id:getManagerStableId(player),
-    league_id:leagueId,
-    name:player.name,
-    team:player.team||'',
-    base_series_wins:getLegacySeriesBaseline(player.name),
-    sort_order:index
-  }));
-
-  const managerIdByIdx=new Map(managerRowsOut.map((manager,index)=>[index,manager.id]));
-  const matchRows=data.matches.map(match=>({
-    league_id:leagueId,
-    legacy_client_id:Number(match.id),
-    display_date:match.date||'',
-    league_date_iso:match.dateISO,
-    month_key:match.monthKey||getMonthKeyFromDateISO(match.dateISO),
-    home_manager_id:managerIdByIdx.get(Number(match.home)),
-    away_manager_id:managerIdByIdx.get(Number(match.away)),
-    home_goals:Number(match.hg)||0,
-    away_goals:Number(match.ag)||0,
-    match_type:match.matchType||'normal',
-    pen_winner_manager_id:match.penWinner===null||match.penWinner===undefined
-      ? null
-      : managerIdByIdx.get(Number(match.penWinner))||null,
-    series_clinch:!!match.seriesClinch
-  }));
-
-  const scorerRows=[];
-  const dnpRows=[];
-  data.matches.forEach(match=>{
-    const matchId=matchIdByLegacyId.get(String(match.id));
-    if(!matchId)return;
-    (match.scorers||[]).forEach((scorer,index)=>{
-      scorerRows.push({
-        id:stableIdFromString('match-scorer:'+match.id+':'+index+':'+(scorer.name||'')+':'+(scorer.team||'')),
-        match_id:matchId,
-        player_name:scorer.name,
-        team_name:scorer.team,
-        goals:Number(scorer.goals)||0,
-        headers:Number(scorer.headers)||0,
-        free_kicks:Number(scorer.fk)||0,
-        long_shots:Number(scorer.ls)||0,
-        penalties:Number(scorer.pen)||0,
-        assists:Number(scorer.assists)||0
-      });
-    });
-    (match.dnps||[]).forEach((dnp,index)=>{
-      const managerId=managerIdByIdx.get(Number(dnp.managerIdx));
-      if(!managerId)return;
-      dnpRows.push({
-        id:stableIdFromString('match-dnp:'+match.id+':'+index+':'+(dnp.name||'')),
-        match_id:matchId,
-        manager_id:managerId,
-        player_name:dnp.name
-      });
-    });
-  });
-
-  return {managerRows:managerRowsOut,matchRows,scorerRows,dnpRows};
-}
-
 async function supabaseFetch(path, options={}){
   const {method='GET', body=null, prefer='', noContentOk=false}=options;
   const headers={
@@ -1284,7 +1199,6 @@ async function saveRemoteSnapshot(data){
   if(!league)throw new Error('League row missing after upsert');
 
   const managerSeed=outbound.players.map((player,index)=>({
-    id:getManagerStableId(player),
     league_id:league.id,
     name:player.name,
     team:player.team||'',
@@ -1360,7 +1274,6 @@ async function saveRemoteSnapshot(data){
     if(!matchId)return;
     (match.scorers||[]).forEach((scorer,index)=>{
       scorerPayload.push({
-        id:stableIdFromString('match-scorer:'+match.id+':'+index+':'+(scorer.name||'')+':'+(scorer.team||'')),
         match_id:matchId,
         player_name:scorer.name,
         team_name:scorer.team,
@@ -1376,7 +1289,6 @@ async function saveRemoteSnapshot(data){
       const managerId=managerIdByIdx.get(Number(dnp.managerIdx));
       if(!managerId)return;
       dnpPayload.push({
-        id:stableIdFromString('match-dnp:'+match.id+':'+index+':'+(dnp.name||'')),
         match_id:matchId,
         manager_id:managerId,
         player_name:dnp.name
@@ -1384,17 +1296,17 @@ async function saveRemoteSnapshot(data){
     });
   });
   if(scorerPayload.length){
-    await supabaseFetch('/match_scorers?on_conflict=id',{
+    await supabaseFetch('/match_scorers',{
       method:'POST',
       body:scorerPayload,
-      prefer:'resolution=merge-duplicates,return=minimal'
+      prefer:'return=minimal'
     });
   }
   if(dnpPayload.length){
-    await supabaseFetch('/match_dnps?on_conflict=id',{
+    await supabaseFetch('/match_dnps',{
       method:'POST',
       body:dnpPayload,
-      prefer:'resolution=merge-duplicates,return=minimal'
+      prefer:'return=minimal'
     });
   }
 

@@ -928,7 +928,10 @@ localStorage.setItem(LS_BIN_KEY, HARDCODED_BIN_ID);
 let syncTimeout=null;
 let currentDataUpdatedAt=0;
 let lastConfirmedCloudSyncAt=0;
+let lastLoadedCloudUpdatedAt=0;
 let hasPendingLocalChanges=false;
+let isBootHydrating=true;
+let pendingHydrationWrite=false;
 
 function setSyncStatus(msg, colour='var(--muted)'){
   const el=document.getElementById('sync-status');
@@ -1037,10 +1040,96 @@ function getDataSnapshot(){
   return {players,matches,manualActiveMonthKey,updatedAt:currentDataUpdatedAt||Date.now()};
 }
 
+function sortMatchesChronologically(list){
+  return [...list].sort((a,b)=>(Number(a.id)||0)-(Number(b.id)||0));
+}
+
+function tryMergeAppendOnlyData(remoteData,localData){
+  const remote=normaliseData(remoteData);
+  const local=normaliseData(localData);
+  if(JSON.stringify(remote.players)!==JSON.stringify(local.players))return null;
+
+  const remoteMap=new Map(remote.matches.map(m=>[String(m.id),m]));
+  const localMap=new Map(local.matches.map(m=>[String(m.id),m]));
+  const sharedIds=[...remoteMap.keys()].filter(id=>localMap.has(id));
+  for(const id of sharedIds){
+    if(JSON.stringify(remoteMap.get(id))!==JSON.stringify(localMap.get(id)))return null;
+  }
+
+  const sharedMaxId=sharedIds.reduce((max,id)=>Math.max(max,Number(id)||0),0);
+  const remoteOnly=[...remoteMap.keys()].filter(id=>!localMap.has(id));
+  const localOnly=[...localMap.keys()].filter(id=>!remoteMap.has(id));
+  if(remoteOnly.some(id=>(Number(id)||0)<=sharedMaxId))return null;
+  if(localOnly.some(id=>(Number(id)||0)<=sharedMaxId))return null;
+
+  const mergedMatches=sortMatchesChronologically([...remote.matches,...localOnly.map(id=>localMap.get(id))]);
+  return {
+    players:local.players,
+    matches:mergedMatches,
+    manualActiveMonthKey:compareMonthKeys(local.manualActiveMonthKey||'',remote.manualActiveMonthKey||'')>=0
+      ? (local.manualActiveMonthKey||'')
+      : (remote.manualActiveMonthKey||''),
+    updatedAt:Date.now()
+  };
+}
+
+function finishBootHydration(commitToCloud=false){
+  const pending=pendingHydrationWrite;
+  isBootHydrating=false;
+  pendingHydrationWrite=false;
+  if(!pending)return;
+  if(commitToCloud){
+    saveData();
+    return;
+  }
+  localStorage.setItem(LS_CACHE,JSON.stringify(getDataSnapshot()));
+}
+
 async function cloudSave(data){
   setSyncStatus('Saving…');
+  let outbound=normaliseData(data);
   try{
-    const body=JSON.stringify(data);
+    const latestRes=await fetch(JSONBIN_URL+'/'+binId+'/latest',{
+      headers:{'X-Access-Key':JSONBIN_KEY}
+    });
+    const latestJson=await latestRes.json();
+    if(latestJson.record){
+      const remoteData=normaliseData(latestJson.record);
+      lastLoadedCloudUpdatedAt=Math.max(lastLoadedCloudUpdatedAt,remoteData.updatedAt||0);
+      if(sameSnapshot(remoteData,outbound)){
+        applyData(remoteData);
+        localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
+        lastConfirmedCloudSyncAt=Date.now();
+        hasPendingLocalChanges=false;
+        setSyncStatus('Synced ✓','var(--green)');
+        setSyncWarning('');
+        updateSyncMeta();
+        return;
+      }
+      if(remoteData.updatedAt>(outbound.updatedAt||0)){
+        const merged=tryMergeAppendOnlyData(remoteData,outbound);
+        if(merged){
+          outbound=normaliseData(merged);
+          currentDataUpdatedAt=outbound.updatedAt;
+          setSyncWarning('Merged newer cloud changes before saving.');
+        } else {
+          saveRevision('sync-conflict-local',outbound);
+          saveRevision('sync-conflict-remote',remoteData);
+          setSyncStatus('Sync conflict','var(--red)');
+          setSyncWarning('Cloud changed elsewhere. Export before continuing so nothing gets lost.');
+          updateSyncMeta();
+          return;
+        }
+      } else {
+        outbound.updatedAt=Date.now();
+        currentDataUpdatedAt=outbound.updatedAt;
+      }
+    } else {
+      outbound.updatedAt=Date.now();
+      currentDataUpdatedAt=outbound.updatedAt;
+    }
+
+    const body=JSON.stringify(outbound);
     const res=await fetch(JSONBIN_URL+'/'+binId,{
       method:'PUT',
       headers:{'Content-Type':'application/json','X-Access-Key':JSONBIN_KEY},
@@ -1048,6 +1137,8 @@ async function cloudSave(data){
     });
     const json=await res.json();
     if(json.metadata){
+      applyData(outbound);
+      lastLoadedCloudUpdatedAt=outbound.updatedAt||lastLoadedCloudUpdatedAt;
       lastConfirmedCloudSyncAt=Date.now();
       hasPendingLocalChanges=false;
       setSyncStatus('Saved ✓','var(--green)');
@@ -1057,12 +1148,12 @@ async function cloudSave(data){
       setSyncStatus('Save failed','var(--red)');
       updateSyncMeta();
     }
-    localStorage.setItem(LS_CACHE,JSON.stringify(data));
+    localStorage.setItem(LS_CACHE,JSON.stringify(outbound));
   } catch(e){
     setSyncStatus('Offline — saved locally','var(--gold)');
     hasPendingLocalChanges=true;
     updateSyncMeta();
-    localStorage.setItem(LS_CACHE,JSON.stringify(data));
+    localStorage.setItem(LS_CACHE,JSON.stringify(outbound||data));
   }
 }
 
@@ -1100,6 +1191,7 @@ async function cloudLoad(){
         }
         applyData(remoteData);
         localStorage.setItem(LS_CACHE,JSON.stringify(remoteData));
+        lastLoadedCloudUpdatedAt=remoteData.updatedAt||0;
         lastConfirmedCloudSyncAt=Date.now();
         hasPendingLocalChanges=false;
         setSyncStatus('Synced ✓','var(--green)');
@@ -1153,6 +1245,11 @@ function loadData(){
 }
 
 function saveData(){
+  if(isBootHydrating){
+    pendingHydrationWrite=true;
+    localStorage.setItem(LS_CACHE,JSON.stringify(getDataSnapshot()));
+    return;
+  }
   currentDataUpdatedAt=Date.now();
   const data=getDataSnapshot();
   // Always write to local cache immediately
@@ -2418,15 +2515,19 @@ function getMonthsWon(){
   }
   // Always try to sync from cloud (updates UI if newer data found)
   const cloudResult=await cloudLoad();
-  if(cloudResult==='synced'&&players.length===3){
+  if((cloudResult==='synced'||cloudResult==='restored-local')&&players.length===3){
     backfillDates();
     migrateBaseSeriesWins();
     migrateLeagueRolloverDates();
     clearExpiredMonthOverride();
     launchApp();
+    finishBootHydration(true);
   } else if(cloudResult==='empty'&&!localResult){
     document.getElementById('setup-screen').style.display='block';
     setSyncStatus('');
+    finishBootHydration(false);
+  } else {
+    finishBootHydration(false);
   }
 })();
 

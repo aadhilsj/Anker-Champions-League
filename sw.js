@@ -1,4 +1,4 @@
-const CACHE_VERSION='acl-pwa-v8';
+const CACHE_VERSION='acl-pwa-v9';
 const APP_SHELL=[
   '/',
   '/index.html',
@@ -6,7 +6,9 @@ const APP_SHELL=[
   '/favicon-32.png',
   '/apple-touch-icon.png',
   '/icon-192.png',
-  '/icon-512.png'
+  '/icon-512.png',
+  '/icon-192.png?v=20260502',
+  '/icon-512.png?v=20260502'
 ];
 
 self.addEventListener('install',event=>{

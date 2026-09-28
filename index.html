@@ -759,7 +759,7 @@
   <!-- FULL RANKINGS -->
   <div id="tab-rankings" style="display:none">
     <div class="section-title">FULL RANKINGS</div>
-    <p class="page-intro">Every manager, every result, and a profile you can actually explore. 1v1 points are 3 per win; 2v2 is ranked separately by series wins.</p>
+    <p class="page-intro">Every manager, every result, and a profile you can actually explore. Points are 3 for a 1v1 win and 5 for a 2v2 series win. Casual 2v2 wins do not add league points.</p>
     <div class="log-card" style="padding:0;overflow:hidden;">
       <div class="table-scroll">
         <table class="standings-table rankings-table" aria-label="Full manager rankings">
@@ -2052,7 +2052,7 @@ function openProfile(idx){
   const recent=matches.filter(m=>m.home===idx||m.away===idx).slice(-5).reverse();
   const averageGoals=s.played?(s.gf/s.played).toFixed(2):'—';
   const averageAssists=s.played?(scorerTotals.assists/s.played).toFixed(2):'—';
-  const pointsExplanation='1v1 points: 3 for a win, 0 for a loss. Draws are not currently used. 2v2 is ranked separately by series wins so the two formats stay fair.';
+  const pointsExplanation='League points: 3 for every 1v1 win and 5 for every 2v2 series win. Casual 2v2 wins are tracked separately and do not add points. Losses and draws add 0 points.';
   document.getElementById('profile-content').innerHTML=`<div class="profile-hero"><div class="profile-initial">${p.name.charAt(0).toUpperCase()}</div><div><h3>${p.name}</h3><p>${p.team||'Team not set'} · Manager profile</p></div></div><div class="profile-stat-grid"><div class="profile-stat"><strong>${s.played?s.pts:'—'}</strong><span>1V1 Points</span></div><div class="profile-stat"><strong>${s.played||'—'}</strong><span>1V1 Matches</span></div><div class="profile-stat"><strong>${s.played?s.wins+'–'+s.losses:'—'}</strong><span>1V1 Record</span></div><div class="profile-stat"><strong>${s.played?s.gd>=0?`+${s.gd}`:s.gd:'—'}</strong><span>Goal Difference</span></div></div><div class="profile-stat-grid"><div class="profile-stat"><strong>${s.played?s.gf:'—'}</strong><span>Goals Scored</span></div><div class="profile-stat"><strong>${s.played?s.ga:'—'}</strong><span>Goals Against</span></div><div class="profile-stat"><strong>${averageGoals}</strong><span>Average Goals</span></div><div class="profile-stat"><strong>${s.played?s.cs:'—'}</strong><span>Clean Sheets</span></div></div><div class="profile-detail-strip"><div><strong>${scorerTotals.assists||'—'}</strong><span>Assists</span></div><div><strong>${averageAssists}</strong><span>Average Assists</span></div><div><strong>${two.played?two.series:'—'}</strong><span>2V2 Series Wins</span></div><div><strong>${two.played?two.series+'–'+two.losses:'—'}</strong><span>2V2 Series Record</span></div></div><div class="profile-explainer"><strong>How this works</strong><p>${pointsExplanation}</p><p>1v1 matches means completed head-to-head FIFA games. 2v2 series wins means a duo reached four game wins. Casual 2v2 matches are tracked separately: ${two.matchWins||0} casual win${two.matchWins===1?'':'s'} for this manager.</p></div><div class="profile-section-title">Recent 1V1 Results</div>${recent.length?recent.map(m=>{const won=matchResult(m,idx)==='W';const home=players[m.home]?.name||'Home',away=players[m.away]?.name||'Away';return `<div class="profile-result"><span>${home} ${m.hg}–${m.ag} ${away}</span><strong style="color:var(${won?'--green':matchResult(m,idx)==='L'?'--red':'--gold'})">${won?'WIN':matchResult(m,idx)==='L'?'LOSS':'DRAW'}</strong></div>`;}).join(''):'<div class="empty-state">No 1v1 results yet.</div>'}`;
   document.getElementById('profile-modal').style.display='flex';document.body.classList.add('modal-open');
 }
@@ -2653,6 +2653,8 @@ function getCleanSheets(idx,subset){
 }
 function getStats(subset){
   const ms=subset||matches;
+  const includeTwoVTwoPoints=!subset;
+  const twoStats=includeTwoVTwoPoints?getTwoVTwoStats():[];
   return players.map((p,i)=>{
     const pl=ms.filter(m=>m.home===i||m.away===i);
     const wins=pl.filter(m=>matchResult(m,i)==='W').length;
@@ -2660,7 +2662,8 @@ function getStats(subset){
     const losses=pl.filter(m=>matchResult(m,i)==='L').length;
     const gf=pl.reduce((s,m)=>s+(m.home===i?m.hg:m.ag),0);
     const ga=pl.reduce((s,m)=>s+(m.home===i?m.ag:m.hg),0);
-    return{name:p.name,team:p.team,idx:i,played:pl.length,wins,draws,losses,gf,ga,gd:gf-ga,pts:wins*3,cs:getCleanSheets(i,ms),streak:getWinStreak(i)};
+    const twoVTwoSeriesWins=twoStats.find(stat=>stat.idx===i)?.series||0;
+    return{name:p.name,team:p.team,idx:i,played:pl.length,wins,draws,losses,gf,ga,gd:gf-ga,pts:wins*3+(includeTwoVTwoPoints?twoVTwoSeriesWins*5:0),oneVOnePts:wins*3,twoVTwoSeriesWins,cs:getCleanSheets(i,ms),streak:getWinStreak(i)};
   }).sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
 }
 

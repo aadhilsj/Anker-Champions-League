@@ -11,18 +11,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --green:#ff9f43; --green-dim:#e47724; --dark:#08090b; --surface:#121416;
-    --surface2:#211b18; --surface3:#30251f; --border:rgba(255,255,255,0.09);
+    --green:#ff9f43; --green-dim:#e47724; --dark:#050608; --surface:#0d1012;
+    --surface2:#171514; --surface3:#211d1a; --border:rgba(255,255,255,0.09);
     --text:#fff5ed; --muted:#a48f82; --red:#ff6b5f; --gold:#ffd166; --blue:#51d6ff;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:radial-gradient(circle at 18% 0%,rgba(255,159,67,0.18),transparent 32%),radial-gradient(circle at 92% 20%,rgba(255,107,95,0.10),transparent 26%),var(--dark);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;padding:24px 16px 80px;}
+  body{background:radial-gradient(circle at 18% 0%,rgba(255,159,67,0.08),transparent 30%),radial-gradient(circle at 92% 20%,rgba(255,107,95,0.055),transparent 24%),var(--dark);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;padding:24px 16px 80px;}
 
   /* HEADER */
   .header{text-align:center;margin-bottom:30px;position:relative;isolation:isolate;}
   .header h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,8vw,70px);letter-spacing:4px;line-height:1;background:linear-gradient(135deg,#fff 20%,#ffd6ad 58%,#ff9f43);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
   .header p{color:var(--muted);font-size:11px;letter-spacing:2.5px;text-transform:uppercase;margin-top:7px;}
-  .header-art{position:absolute;inset:-28px -8% -24px;z-index:-1;pointer-events:none;overflow:hidden;opacity:.8;}
+  .header-art{position:absolute;inset:-28px -8% -24px;z-index:-1;pointer-events:none;overflow:hidden;opacity:.58;}
   .header-art svg{width:100%;height:100%;overflow:visible;}
   .header-art .pitch-line{fill:none;stroke:rgba(255,159,67,.20);stroke-width:1.4;stroke-linecap:round;}
   .header-art .motion-line{fill:none;stroke:rgba(255,107,95,.30);stroke-width:2;stroke-linecap:round;stroke-dasharray:2 7;}
@@ -310,7 +310,7 @@
   .league-switcher span:last-child{color:var(--muted);font-size:11px;}
   .context-note{font-size:11px;color:var(--muted);letter-spacing:0.6px;}
   .dashboard-hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,0.65fr);gap:16px;margin-bottom:18px;}
-  .hero-card{position:relative;overflow:hidden;background:linear-gradient(135deg,#21160f 0%,#111416 72%);border:1px solid rgba(255,159,67,0.28);border-radius:20px;padding:25px;min-height:210px;}
+  .hero-card{position:relative;overflow:hidden;background:linear-gradient(135deg,#171311 0%,#0d1011 74%);border:1px solid rgba(255,159,67,0.22);border-radius:20px;padding:25px;min-height:210px;}
   .hero-card:before{content:'';position:absolute;width:260px;height:260px;right:-90px;top:-120px;border-radius:50%;background:radial-gradient(circle,rgba(255,107,95,0.26),transparent 68%);pointer-events:none;}
   .hero-card:after{content:'';position:absolute;right:26px;bottom:-64px;width:190px;height:190px;border:1px solid rgba(255,159,67,.18);border-radius:50%;box-shadow:0 0 0 22px rgba(255,159,67,.035),0 0 0 46px rgba(255,159,67,.025);transform:rotate(-18deg);pointer-events:none;}
   .hero-card:before{content:'';position:absolute;width:260px;height:260px;right:-90px;top:-120px;border-radius:50%;background:radial-gradient(circle,rgba(255,107,95,0.26),transparent 68%);pointer-events:none;}
@@ -1602,7 +1602,10 @@ async function cloudSave(data){
     }
     localStorage.setItem(LS_CACHE,JSON.stringify(savedRemote||outbound));
   } catch(e){
-    setSyncStatus('Offline — saved locally','var(--gold)');
+    const localFile=location.protocol==='file:';
+    console.error('Anker Champions League cloud save failed:',e);
+    setSyncStatus(localFile?'Local file — not synced':'Offline — saved locally','var(--gold)');
+    setSyncWarning(localFile?'This file preview cannot be trusted for cloud sync. Use the live HTTPS site to save matches.':'Cloud save failed. Your data is safe locally and will retry when the connection returns.');
     hasPendingLocalChanges=true;
     setIsDirty(true);
     updateSyncMeta();
@@ -1650,7 +1653,10 @@ async function cloudLoad(){
       return 'synced';
     }
   } catch(e){
-    setSyncStatus(cached ? 'Offline — using cached data' : 'Offline','var(--gold)');
+    const localFile=location.protocol==='file:';
+    console.error('Anker Champions League cloud load failed:',e);
+    setSyncStatus(localFile?'Local file — not synced':(cached ? 'Offline — using cached data' : 'Offline'),'var(--gold)');
+    setSyncWarning(localFile?'This file preview cannot be trusted for cloud sync. Use the live HTTPS site to load and save matches.':'Cloud connection failed. Cached data is being shown safely.');
     updateSyncMeta();
   }
   return cached ? 'cached' : 'empty';

@@ -406,6 +406,15 @@
   .table-rank{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--muted);width:54px;}
   .table-player{font-weight:600;color:var(--text);}
   .table-player-sub{display:block;color:var(--muted);font-size:10px;letter-spacing:0.6px;margin-top:3px;text-transform:uppercase;}
+  .supreme-player-row{background:linear-gradient(90deg,rgba(255,211,106,.13),rgba(255,211,106,.035) 48%,transparent)!important;}
+  .supreme-name{color:#ffd36a!important;text-shadow:0 0 16px rgba(255,184,61,.35);font-weight:700;}
+  .supreme-badge{display:inline-flex;align-items:center;gap:5px;margin-top:5px;color:#ffd36a;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;font-weight:700;}
+  .supreme-badge::before,.supreme-badge::after{content:'✦';font-size:10px;color:#fff0b0;}
+  .supreme-card{border-color:rgba(255,211,106,.72)!important;box-shadow:0 0 28px rgba(255,184,61,.13),inset 0 1px 0 rgba(255,240,176,.14);background:radial-gradient(circle at 86% 8%,rgba(255,211,106,.2),transparent 32%),var(--surface)!important;}
+  .supreme-card .rank-badge{background:#ffd36a;color:#17110a;box-shadow:0 0 14px rgba(255,211,106,.4);}
+  .supreme-celebration{color:#fff0b0;font-size:13px;letter-spacing:3px;margin-left:4px;white-space:nowrap;}
+  .supreme-profile-hero{border-color:rgba(255,211,106,.62)!important;background:radial-gradient(circle at 85% 10%,rgba(255,211,106,.2),transparent 38%),var(--surface2)!important;}
+  .supreme-profile-hero .profile-initial{background:linear-gradient(145deg,#fff0b0,#d99522);color:#241705;box-shadow:0 0 24px rgba(255,211,106,.4);}
   .table-number{font-family:'Bebas Neue',sans-serif;font-size:20px;}
   .table-points{font-family:'Bebas Neue',sans-serif;font-size:25px;color:var(--green);}
   .table-leading .table-points{color:var(--gold);}
@@ -1254,6 +1263,16 @@ function canonicalManagerName(name){
   return value.toLowerCase()==='ihit'?'Ihti':value;
 }
 
+function isSupremePlayer(name){
+  return canonicalManagerName(name).toLowerCase()==='ihti';
+}
+function supremeName(name){
+  return isSupremePlayer(name)?`<span class="supreme-name">♛ ${canonicalManagerName(name)}</span>`:canonicalManagerName(name);
+}
+function supremeBadge(name){
+  return isSupremePlayer(name)?'<span class="supreme-badge">SUPREME PLAYER</span>':'';
+}
+
 function normaliseData(raw){
   const d=raw||{};
   const nextTwoVTwo=Array.isArray(d.twoVTwoSeries)?d.twoVTwoSeries:(typeof twoVTwoSeries!=='undefined'?twoVTwoSeries:[]);
@@ -2022,7 +2041,7 @@ function renderTwoVTwo(){
   if(!ranking||!history)return;
   if(document.getElementById('two-v-two-format')?.value!=='match')renderTwoVTwoGameEditor();
   const stats=getTwoVTwoStats();
-  ranking.innerHTML=stats.map((s,rank)=>`<div class="two-v-two-rank-row"><div class="two-v-two-rank-num">${rank+1}</div><div class="two-v-two-rank-name">${s.name}<small>${s.played?`${s.series} series wins · ${s.losses} series losses · ${s.matchWins||0} casual wins`:'No 2v2 games yet'}</small></div><div class="two-v-two-rank-record">${s.series}<small>Series W</small></div><div class="two-v-two-rank-record">${s.matchWins||0}<small>Casual W</small></div></div>`).join('');
+  ranking.innerHTML=stats.map((s,rank)=>`<div class="two-v-two-rank-row ${isSupremePlayer(s.name)?'supreme-player-row':''}"><div class="two-v-two-rank-num">${rank+1}</div><div class="two-v-two-rank-name">${supremeName(s.name)} ${supremeBadge(s.name)}<small>${s.played?`${s.series} series wins · ${s.losses} series losses · ${s.matchWins||0} casual wins`:'No 2v2 games yet'}</small></div><div class="two-v-two-rank-record">${s.series}<small>Series W</small></div><div class="two-v-two-rank-record">${s.matchWins||0}<small>Casual W</small></div></div>`).join('');
   history.innerHTML=twoVTwoSeries.length?[...twoVTwoSeries].reverse().map(s=>{
     const games=getSeriesGames(s);
     const gameList=games.length?`<div class="history-game-list">${games.map((game,index)=>`<span class="history-game-chip">G${index+1} ${game.a}–${game.b}</span>`).join('')}</div>`:'';
@@ -2033,7 +2052,7 @@ function renderTwoVTwo(){
 function renderRankingsPage(){
   const tbody=document.getElementById('rankings-tbody');if(!tbody)return;
   const stats=getStats();
-  tbody.innerHTML=stats.map((s,rank)=>`<tr data-profile-idx="${s.idx}" tabindex="0"><td class="table-rank">${rank+1}</td><td><span class="table-player">${s.name}</span><span class="table-player-sub">${s.team||'Team not set'}</span></td><td class="table-number">${s.played||'—'}</td><td class="table-number">${s.played?s.wins:'—'}</td><td class="table-number">${s.played?s.losses:'—'}</td><td class="table-number">${s.played?s.gf:'—'}</td><td class="table-number">${s.played?s.ga:'—'}</td><td class="table-number">${s.played?(s.gd>=0?'+':'')+s.gd:'—'}</td><td class="table-number">${s.played?s.cs:'—'}</td><td class="table-points">${s.played?s.pts:'—'}</td><td><button type="button" class="profile-link" data-profile-button="${s.idx}">Profile</button></td></tr>`).join('');
+  tbody.innerHTML=stats.map((s,rank)=>`<tr class="${isSupremePlayer(s.name)?'supreme-player-row':''}" data-profile-idx="${s.idx}" tabindex="0"><td class="table-rank">${rank+1}</td><td><span class="table-player">${supremeName(s.name)}</span>${supremeBadge(s.name)}<span class="table-player-sub">${s.team||'Team not set'}</span></td><td class="table-number">${s.played||'—'}</td><td class="table-number">${s.played?s.wins:'—'}</td><td class="table-number">${s.played?s.losses:'—'}</td><td class="table-number">${s.played?s.gf:'—'}</td><td class="table-number">${s.played?s.ga:'—'}</td><td class="table-number">${s.played?(s.gd>=0?'+':'')+s.gd:'—'}</td><td class="table-number">${s.played?s.cs:'—'}</td><td class="table-points">${s.played?s.pts:'—'}</td><td><button type="button" class="profile-link" data-profile-button="${s.idx}">Profile</button></td></tr>`).join('');
   tbody.querySelectorAll('[data-profile-idx]').forEach(row=>{
     const idx=Number(row.dataset.profileIdx);
     row.addEventListener('click',()=>openProfile(idx));
@@ -2086,9 +2105,9 @@ function renderStandingsTable(stats=getStats()){
     return;
   }
   tbody.innerHTML=stats.map((s,rank)=>`
-    <tr class="${rank===0?'table-leading':''}" data-profile-idx="${s.idx}" tabindex="0">
+    <tr class="${rank===0?'table-leading ':''}${isSupremePlayer(s.name)?'supreme-player-row':''}" data-profile-idx="${s.idx}" tabindex="0">
       <td class="table-rank">${rank+1}</td>
-      <td><span class="table-player">${s.name}</span><span class="table-player-sub">${s.team||'Team not set'}</span></td>
+      <td><span class="table-player">${supremeName(s.name)}</span>${supremeBadge(s.name)}<span class="table-player-sub">${s.team||'Team not set'}</span></td>
       <td class="table-number" style="color:var(--green)">${s.wins}</td>
       <td class="table-number" style="color:var(--red)">${s.losses}</td>
       <td class="table-number">${s.played}</td>
@@ -2681,9 +2700,9 @@ function renderStandings(){
     const sc=s.streak;
     const sh=sc.count>1?`<span class="streak-badge streak-${sc.type.toLowerCase()}">${sc.count}${sc.type}</span>`:'';
     grid.innerHTML+=`
-      <div class="player-card ${rc}">
+      <div class="player-card ${rc} ${isSupremePlayer(s.name)?'supreme-card':''}">
         <div class="rank-badge">${rank+1}</div>
-        <div class="player-name-big">${fi(s)} ${s.name} ${sh}</div>
+        <div class="player-name-big">${fi(s)} ${supremeName(s.name)} ${sh} ${isSupremePlayer(s.name)?'<span class="supreme-celebration">✦ ✧ ✦</span>':''}</div>
         <div class="player-team-sub" style="${teamColourStyle(s.team)}">${s.team||'—'}</div>
         <div style="margin-bottom:12px">
           <div class="pts-big" style="color:${rank===0?'var(--gold)':'var(--green)'}">${s.pts}</div>

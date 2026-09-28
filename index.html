@@ -375,6 +375,24 @@
   .series-history-row{display:flex;justify-content:space-between;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:8px;}
   .series-history-duo{font-size:12px;line-height:1.5;}.series-history-duo strong{color:var(--text);}.series-history-score{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--green);white-space:nowrap;}.series-history-date{font-size:10px;color:var(--muted);white-space:nowrap;}
   .series-type-label{display:block;color:var(--muted);font-size:9px;letter-spacing:1px;text-align:center;}
+  .series-games-editor{margin-top:20px;padding:13px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;}
+  .series-games-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;}
+  .series-games-title{font-size:11px;letter-spacing:1.4px;color:var(--muted);font-weight:600;}
+  .series-live-score{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--green);letter-spacing:1px;}
+  .series-game-row{display:grid;grid-template-columns:54px 1fr 20px 1fr 74px;align-items:center;gap:8px;margin-bottom:8px;}
+  .series-game-label{font-size:11px;color:var(--muted);letter-spacing:.5px;}
+  .series-game-row input{min-width:0;text-align:center;padding:8px 5px;font-size:16px;}
+  .series-game-dash{text-align:center;color:var(--muted);}
+  .series-game-status{font-size:10px;text-align:right;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;}
+  .series-game-status.a-win{color:var(--green);}.series-game-status.b-win{color:var(--blue);}
+  .series-add-game{margin-top:3px;width:100%;}
+  .series-games-note{font-size:11px;color:var(--muted);line-height:1.4;margin-top:9px;}
+  .series-history-actions{display:flex;align-items:center;gap:10px;margin-left:auto;}
+  .series-undo-btn{border:1px solid rgba(255,69,96,.35);background:transparent;color:var(--red);border-radius:7px;padding:6px 9px;font-size:10px;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;}
+  .series-undo-btn:hover{background:rgba(255,69,96,.1);}
+  .history-kind{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:999px;padding:3px 7px;color:var(--muted);font-size:9px;letter-spacing:1px;margin-left:8px;}
+  .history-game-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .history-game-chip{background:var(--surface3);border:1px solid var(--border);border-radius:5px;padding:4px 7px;font-size:11px;color:var(--text);}
   .dashboard-section-head{display:flex;justify-content:space-between;align-items:end;margin:26px 0 12px;}
   .dashboard-section-head .section-title{margin:0;}
   .section-link{background:transparent;border:0;color:var(--green);font-size:11px;letter-spacing:0.8px;text-transform:uppercase;cursor:pointer;}
@@ -765,14 +783,20 @@
           <div class="duo-vs">VS</div>
           <div class="duo-panel duo-b"><label class="field-label">DUO B</label><select id="duo-b-1"></select><select id="duo-b-2"></select></div>
         </div>
-        <div class="series-score-grid"><div><label class="field-label" id="duo-a-score-label">DUO A WINS</label><input type="number" id="duo-a-wins" min="0" max="4" value="4"/></div><div class="series-dash">–</div><div><label class="field-label" id="duo-b-score-label">DUO B WINS</label><input type="number" id="duo-b-wins" min="0" max="4" value="2"/></div></div>
+        <div id="series-score-editor" class="series-games-editor">
+          <div class="series-games-header"><span class="series-games-title">INDIVIDUAL GAMES</span><span class="series-live-score" id="series-live-score">0–0</span></div>
+          <div id="series-games-list"></div>
+          <button type="button" class="btn secondary sm series-add-game" onclick="addTwoVTwoGame()">+ ADD GAME</button>
+          <div class="series-games-note">Add each game in the series. The series score is calculated automatically; first duo to four wins takes it.</div>
+        </div>
+        <div id="casual-score-editor" class="series-score-grid" style="display:none"><div><label class="field-label" id="duo-a-score-label">DUO A GOALS</label><input type="number" id="duo-a-wins" min="0" max="20" value="4"/></div><div class="series-dash">–</div><div><label class="field-label" id="duo-b-score-label">DUO B GOALS</label><input type="number" id="duo-b-wins" min="0" max="20" value="2"/></div></div>
         <label class="field-label">DATE</label><input type="date" id="two-v-two-date"/>
-        <button class="btn" onclick="saveTwoVTwoSeries()">SAVE SERIES</button>
+        <button class="btn" id="save-two-v-two-btn" onclick="saveTwoVTwoSeries()">SAVE SERIES</button>
         <div id="two-v-two-validation" class="validation-warn"></div>
       </div>
       <div class="log-card two-v-two-ranking-card"><div class="two-v-two-heading"><div><h2>PLAYER RANKING</h2><p class="hint">Series record across every duo.</p></div></div><div id="two-v-two-ranking"></div></div>
     </div>
-    <div class="section-title two-v-two-history-title">SERIES HISTORY</div>
+    <div class="section-title two-v-two-history-title">2V2 HISTORY</div>
     <div id="two-v-two-history"></div>
   </div>
 
@@ -1359,6 +1383,7 @@ async function fetchRemoteSnapshot(){
 
   const managerRows=await supabaseFetch('/managers?league_id=eq.'+league.id+'&select=*&order=sort_order.asc');
   const matchRows=await supabaseFetch('/matches?league_id=eq.'+league.id+'&select=*&order=legacy_client_id.asc');
+  const twoVTwoRows=await supabaseFetch('/two_v_two_series?league_id=eq.'+league.id+'&select=*&order=id.asc');
   const matchIds=matchRows.map(match=>match.id);
   let scorerRows=[];
   let dnpRows=[];
@@ -1414,6 +1439,16 @@ async function fetchRemoteSnapshot(){
         managerIdx:managerIndexById.get(row.manager_id)
       }))
     })),
+    twoVTwoSeries:twoVTwoRows.map(series=>({
+      id:Number(series.id),
+      format:series.format,
+      date:series.display_date,
+      duoA:Array.isArray(series.duo_a)?series.duo_a:[],
+      duoB:Array.isArray(series.duo_b)?series.duo_b:[],
+      aWins:Number(series.a_wins)||0,
+      bWins:Number(series.b_wins)||0,
+      games:Array.isArray(series.games)?series.games:[]
+    })),
     manualActiveMonthKey:league.manual_active_month_key||'',
     updatedAt:Date.parse(league.updated_at)||0
   });
@@ -1447,6 +1482,34 @@ async function saveRemoteSnapshot(data){
   });
   const managerRows=await supabaseFetch('/managers?league_id=eq.'+league.id+'&select=*&order=sort_order.asc');
   const managerIdByIdx=new Map(managerRows.map((manager,index)=>[index,manager.id]));
+
+  const twoVTwoPayload=outbound.twoVTwoSeries.map(series=>({
+    league_id:league.id,
+    id:Number(series.id),
+    format:series.format==='match'?'match':'series',
+    display_date:series.date||getLeagueDateISO(),
+    duo_a:Array.isArray(series.duoA)?series.duoA:[],
+    duo_b:Array.isArray(series.duoB)?series.duoB:[],
+    a_wins:Number(series.aWins)||0,
+    b_wins:Number(series.bWins)||0,
+    games:Array.isArray(series.games)?series.games:[]
+  }));
+  if(twoVTwoPayload.length){
+    await supabaseFetch('/two_v_two_series?on_conflict=league_id,id',{
+      method:'POST',
+      body:twoVTwoPayload,
+      prefer:'resolution=merge-duplicates,return=minimal'
+    });
+  }
+  const remoteTwoVTwo=await supabaseFetch('/two_v_two_series?league_id=eq.'+league.id+'&select=id');
+  const wantedTwoVTwoIds=new Set(outbound.twoVTwoSeries.map(series=>String(series.id)));
+  const obsoleteTwoVTwoIds=remoteTwoVTwo.filter(series=>!wantedTwoVTwoIds.has(String(series.id))).map(series=>series.id);
+  if(obsoleteTwoVTwoIds.length){
+    const obsoleteTwoVTwoList='('+obsoleteTwoVTwoIds.join(',')+')';
+    await supabaseFetch('/two_v_two_series?league_id=eq.'+league.id+'&id=in.'+obsoleteTwoVTwoList,{
+      method:'DELETE',prefer:'return=minimal',noContentOk:true
+    });
+  }
 
   const matchPayload=outbound.matches.map(match=>({
     league_id:league.id,
@@ -1829,6 +1892,60 @@ function populateTwoVTwoSelects(){
   if(date&&!date.value)date.value=getLeagueDateISO();
 }
 
+let twoVTwoDraftGames=[];
+
+function getTwoVTwoDraftGames(){
+  return [...document.querySelectorAll('#series-games-list .series-game-row')].map(row=>({
+    a:Number(row.querySelector('.series-game-a')?.value)||0,
+    b:Number(row.querySelector('.series-game-b')?.value)||0
+  }));
+}
+
+function renderTwoVTwoGameEditor(){
+  const list=document.getElementById('series-games-list');
+  if(!list)return;
+  if(!twoVTwoDraftGames.length)twoVTwoDraftGames=[{a:0,b:0}];
+  list.innerHTML=twoVTwoDraftGames.map((game,index)=>{
+    const a=Number(game.a)||0,b=Number(game.b)||0;
+    const status=a===b?'':a>b?'DUO A':'DUO B';
+    const statusClass=a>b?'a-win':b>a?'b-win':'';
+    return `<div class="series-game-row" data-game-index="${index}">
+      <span class="series-game-label">GAME ${index+1}</span>
+      <input class="series-game-a" type="number" min="0" max="20" value="${a}" aria-label="Game ${index+1} Duo A score" oninput="updateTwoVTwoGame(${index},'a',this.value)"/>
+      <span class="series-game-dash">–</span>
+      <input class="series-game-b" type="number" min="0" max="20" value="${b}" aria-label="Game ${index+1} Duo B score" oninput="updateTwoVTwoGame(${index},'b',this.value)"/>
+      <span class="series-game-status ${statusClass}">${status}</span>
+    </div>`;
+  }).join('');
+  updateTwoVTwoSeriesScore();
+}
+
+function updateTwoVTwoGame(index,side,value){
+  if(!twoVTwoDraftGames[index])twoVTwoDraftGames[index]={a:0,b:0};
+  twoVTwoDraftGames[index][side]=Math.max(0,Number(value)||0);
+  const row=document.querySelector(`#series-games-list [data-game-index="${index}"]`);
+  if(row){
+    const a=twoVTwoDraftGames[index].a,b=twoVTwoDraftGames[index].b;
+    const status=row.querySelector('.series-game-status');
+    status.textContent=a===b?'':a>b?'DUO A':'DUO B';
+    status.className='series-game-status '+(a>b?'a-win':b>a?'b-win':'');
+  }
+  updateTwoVTwoSeriesScore();
+}
+
+function updateTwoVTwoSeriesScore(){
+  const score=twoVTwoDraftGames.reduce((out,game)=>{if(Number(game.a)>Number(game.b))out.a++;if(Number(game.b)>Number(game.a))out.b++;return out;},{a:0,b:0});
+  const el=document.getElementById('series-live-score');
+  if(el)el.textContent=score.a+'–'+score.b;
+}
+
+function addTwoVTwoGame(){
+  twoVTwoDraftGames=getTwoVTwoDraftGames();
+  if(twoVTwoDraftGames.length>=7)return;
+  twoVTwoDraftGames.push({a:0,b:0});
+  renderTwoVTwoGameEditor();
+}
+
 function changeTwoVTwoFormat(){
   const casual=document.getElementById('two-v-two-format')?.value==='match';
   document.getElementById('two-v-two-form-title').textContent=casual?'LOG A CASUAL MATCH':'LOG A SERIES';
@@ -1838,6 +1955,10 @@ function changeTwoVTwoFormat(){
   document.getElementById('duo-b-score-label').textContent=casual?'DUO B GOALS':'DUO B WINS';
   document.getElementById('duo-a-wins').max=casual?20:4;
   document.getElementById('duo-b-wins').max=casual?20:4;
+  document.getElementById('series-score-editor').style.display=casual?'none':'block';
+  document.getElementById('casual-score-editor').style.display=casual?'grid':'none';
+  document.getElementById('save-two-v-two-btn').textContent=casual?'SAVE CASUAL MATCH':'SAVE SERIES';
+  if(!casual)renderTwoVTwoGameEditor();
 }
 
 function getTwoVTwoStats(){
@@ -1854,27 +1975,59 @@ function getTwoVTwoStats(){
 
 function saveTwoVTwoSeries(){
   const ids=['duo-a-1','duo-a-2','duo-b-1','duo-b-2'].map(id=>Number(document.getElementById(id).value));
-  const aWins=Number(document.getElementById('duo-a-wins').value),bWins=Number(document.getElementById('duo-b-wins').value);
   const warn=document.getElementById('two-v-two-validation');
   const fail=msg=>{warn.textContent=msg;warn.style.display='block';};
   warn.style.display='none';
   if(new Set(ids).size!==4)return fail('Choose four different players for the two duos.');
   const casual=document.getElementById('two-v-two-format').value==='match';
+  let games=[];
+  let aWins=0,bWins=0;
+  if(casual){
+    aWins=Number(document.getElementById('duo-a-wins').value);bWins=Number(document.getElementById('duo-b-wins').value);
+    games=[{a:aWins,b:bWins}];
+  }else{
+    twoVTwoDraftGames=getTwoVTwoDraftGames();
+    games=twoVTwoDraftGames.map(game=>({a:Number(game.a)||0,b:Number(game.b)||0}));
+    if(!games.length||games.length>7)return fail('Add between 1 and 7 individual games.');
+    if(games.some(game=>game.a===game.b))return fail('Each series game needs a winner. Enter a different score for every game.');
+    aWins=games.filter(game=>game.a>game.b).length;
+    bWins=games.filter(game=>game.b>game.a).length;
+  }
   if(!Number.isInteger(aWins)||!Number.isInteger(bWins)||aWins<0||bWins<0||aWins>(casual?20:4)||bWins>(casual?20:4))return fail(casual?'Enter valid match scores.':'A best-of-seven series must end 4–0, 4–1, 4–2, 4–3, or the reverse.');
   if(!casual&&(Math.max(aWins,bWins)!==4||aWins===bWins))return fail('A best-of-seven series must end 4–0, 4–1, 4–2, 4–3, or the reverse.');
-  twoVTwoSeries.push({id:Date.now(),format:casual?'match':'series',date:document.getElementById('two-v-two-date').value||getLeagueDateISO(),duoA:[ids[0],ids[1]],duoB:[ids[2],ids[3]],aWins,bWins});
+  twoVTwoSeries.push({id:Date.now(),format:casual?'match':'series',date:document.getElementById('two-v-two-date').value||getLeagueDateISO(),duoA:[ids[0],ids[1]],duoB:[ids[2],ids[3]],aWins,bWins,games});
   saveData();
+  twoVTwoDraftGames=[];
   document.getElementById('duo-a-wins').value=4;document.getElementById('duo-b-wins').value=2;
   renderTwoVTwo();
+}
+
+function getSeriesGames(series){
+  if(Array.isArray(series.games)&&series.games.length)return series.games;
+  return [];
+}
+
+function undoTwoVTwo(id){
+  const series=twoVTwoSeries.find(item=>String(item.id)===String(id));
+  if(!series||!confirm('Undo this 2v2 '+(series.format==='match'?'match':'series')+'?'))return;
+  twoVTwoSeries=twoVTwoSeries.filter(item=>String(item.id)!==String(id));
+  saveData();
+  renderTwoVTwo();
+  renderHistory();
 }
 
 function renderTwoVTwo(){
   populateTwoVTwoSelects();
   const ranking=document.getElementById('two-v-two-ranking'),history=document.getElementById('two-v-two-history');
   if(!ranking||!history)return;
+  if(document.getElementById('two-v-two-format')?.value!=='match')renderTwoVTwoGameEditor();
   const stats=getTwoVTwoStats();
   ranking.innerHTML=stats.map((s,rank)=>`<div class="two-v-two-rank-row"><div class="two-v-two-rank-num">${rank+1}</div><div class="two-v-two-rank-name">${s.name}<small>${s.played?`${s.series} series wins · ${s.losses} series losses · ${s.matchWins||0} casual wins`:'No 2v2 games yet'}</small></div><div class="two-v-two-rank-record">${s.series}<small>Series W</small></div><div class="two-v-two-rank-record">${s.matchWins||0}<small>Casual W</small></div></div>`).join('');
-  history.innerHTML=twoVTwoSeries.length?[...twoVTwoSeries].reverse().map(s=>`<div class="series-history-row"><div class="series-history-duo"><strong>${duoName(s.duoA)}</strong><br><span class="muted">${duoName(s.duoB)}</span></div><div><div class="series-history-score">${s.aWins}–${s.bWins}</div><small class="series-type-label">${s.format==='match'?'CASUAL MATCH':'SERIES'}</small></div><div class="series-history-date">${s.date||'—'}</div></div>`).join(''):'<div class="empty-state">NO 2V2 GAMES YET<br><span>Log a series or casual match above.</span></div>';
+  history.innerHTML=twoVTwoSeries.length?[...twoVTwoSeries].reverse().map(s=>{
+    const games=getSeriesGames(s);
+    const gameList=games.length?`<div class="history-game-list">${games.map((game,index)=>`<span class="history-game-chip">G${index+1} ${game.a}–${game.b}</span>`).join('')}</div>`:'';
+    return `<div class="series-history-row"><div class="series-history-duo"><strong>${duoName(s.duoA)}</strong><br><span class="muted">${duoName(s.duoB)}</span>${gameList}</div><div><div class="series-history-score">${s.aWins}–${s.bWins}</div><small class="series-type-label">${s.format==='match'?'CASUAL MATCH':'SERIES'}</small></div><div class="series-history-actions"><div class="series-history-date">${s.date||'—'}</div><button class="series-undo-btn" type="button" onclick="undoTwoVTwo('${s.id}')">Undo</button></div></div>`;
+  }).join(''):'<div class="empty-state">NO 2V2 GAMES YET<br><span>Log a series or casual match above.</span></div>';
 }
 
 function renderRankingsPage(){
@@ -2747,7 +2900,7 @@ function hideConfirm(){
 
 function renderHistory(){
   const list=document.getElementById('history-list');
-  if(!matches.length){list.innerHTML=`<div class="empty-state"><span class="big">NO MATCHES</span>Log your first game!</div>`;return;}
+  if(!matches.length&&!twoVTwoSeries.length){list.innerHTML=`<div class="empty-state"><span class="big">NO MATCHES</span>Log your first game!</div>`;return;}
   list.innerHTML=[...matches].reverse().map(m=>{
     const hR=matchResult(m,m.home),aR=matchResult(m,m.away);
     const cF=r=>r==='W'?'var(--green)':r==='L'?'var(--red)':'var(--gold)';
@@ -2798,6 +2951,15 @@ function renderHistory(){
         ${scorerBody}
       </div>`;
   }).join('');
+
+  if(twoVTwoSeries.length){
+    list.innerHTML+=`<div class="section-title" style="margin-top:28px">2V2 GAMES</div>`;
+    list.innerHTML+=[...twoVTwoSeries].reverse().map(s=>{
+      const games=getSeriesGames(s);
+      const gameList=games.length?`<div class="history-game-list">${games.map((game,index)=>`<span class="history-game-chip">G${index+1} ${game.a}–${game.b}</span>`).join('')}</div>`:'';
+      return `<div class="series-history-row"><div class="series-history-duo"><strong>${duoName(s.duoA)}</strong><br><span class="muted">${duoName(s.duoB)}</span>${gameList}</div><div><div class="series-history-score">${s.aWins}–${s.bWins}</div><small class="series-type-label">${s.format==='match'?'CASUAL MATCH':'SERIES'}</small></div><div class="series-history-actions"><div class="series-history-date">${s.date||'—'}</div><button class="series-undo-btn" type="button" onclick="undoTwoVTwo('${s.id}')">Undo</button></div></div>`;
+    }).join('');
+  }
 
   list.querySelectorAll('.delete-btn').forEach(btn=>{
     btn.addEventListener('click',function(e){

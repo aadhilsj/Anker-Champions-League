@@ -403,11 +403,11 @@
   .standings-table td{padding:15px 16px;border-bottom:1px solid rgba(255,255,255,0.045);font-size:13px;white-space:nowrap;}
   .standings-table tbody tr:last-child td{border-bottom:0;}
   .standings-table tbody tr:hover td{background:rgba(255,255,255,0.025);}
-  .table-rank{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--muted);width:54px;}
+  .table-rank{font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--text);width:54px;}
   .table-player{font-weight:600;color:var(--text);}
   .table-player-sub{display:block;color:var(--muted);font-size:10px;letter-spacing:0.6px;margin-top:3px;text-transform:uppercase;}
-  .table-number{font-family:'Bebas Neue',sans-serif;font-size:30px;font-weight:600;}
-  .table-points{font-family:'Bebas Neue',sans-serif;font-size:32px;font-weight:700;color:var(--text);}
+  .table-number{font-family:'Bebas Neue',sans-serif;font-size:34px;font-weight:600;color:var(--text);}
+  .table-points{font-family:'Bebas Neue',sans-serif;font-size:36px;font-weight:700;color:var(--text);}
   .table-leading .table-points{color:var(--text);}
   .table-empty{padding:34px 16px!important;text-align:center;color:var(--muted)!important;}
   /* Compact table is the primary home view; cards remain available for the future profile view. */
@@ -871,7 +871,7 @@
     <div class="standings-table-card">
       <div class="table-scroll">
         <table class="standings-table" aria-label="League standings">
-          <thead><tr><th>#</th><th>Manager</th><th>W</th><th>L</th><th>Played</th><th>GD</th><th>Points</th></tr></thead>
+          <thead><tr><th>#</th><th>Manager</th><th>W</th><th>L</th><th>Played</th><th>GD</th><th>2V2 Series Won</th><th>Points</th></tr></thead>
           <tbody id="dashboard-standings-tbody"></tbody>
         </table>
       </div>
@@ -2066,15 +2066,24 @@ function renderDashboard(){
   const totalGoals=matches.reduce((sum,m)=>sum+(Number(m.hg)||0)+(Number(m.ag)||0),0);
   const stats=getStats();
   const leader=stats[0];
-  const last=[...matches].sort((a,b)=>String(b.dateISO||'').localeCompare(String(a.dateISO||'')))[0];
+  const lastMatch=matches.map(match=>({kind:'1v1',id:Number(match.id)||0,data:match}));
+  const lastTwoVTwo=twoVTwoSeries.map(series=>({kind:'2v2',id:Number(series.id)||0,data:series}));
+  const last=[...lastMatch,...lastTwoVTwo].sort((a,b)=>b.id-a.id)[0];
   const leaderEl=document.getElementById('dash-leader');
   if(!leaderEl)return;
   document.getElementById('dash-matches').textContent=matches.length?matches.length:'—';
   document.getElementById('dash-goals').textContent=matches.length?totalGoals:'—';
   leaderEl.textContent=matches.length&&leader?.played?leader.name:'—';
   document.getElementById('dash-leader-sub').textContent=leader?.played?`${leader.pts} pts · ${leader.wins}W ${leader.losses}L`:'No results yet';
-  document.getElementById('dash-last-score').textContent=last?`${last.hg}–${last.ag}`:'—';
-  document.getElementById('dash-last-match').textContent=last?`${players[last.home]?.name||'Home'} vs ${players[last.away]?.name||'Away'}`:'No matches yet';
+  if(last?.kind==='2v2'){
+    const series=last.data;
+    document.getElementById('dash-last-score').textContent=`${series.aWins}–${series.bWins}`;
+    document.getElementById('dash-last-match').textContent=`2v2 · ${duoName(series.duoA)} vs ${duoName(series.duoB)}`;
+  }else{
+    const match=last?.data;
+    document.getElementById('dash-last-score').textContent=match?`${match.hg}–${match.ag}`:'—';
+    document.getElementById('dash-last-match').textContent=match?`${players[match.home]?.name||'Home'} vs ${players[match.away]?.name||'Away'}`:'No matches yet';
+  }
   renderStandingsTable(stats);
 }
 
@@ -2093,10 +2102,11 @@ function renderStandingsTable(stats=getStats()){
     <tr class="${rank===0?'table-leading ':''}" data-profile-idx="${s.idx}" tabindex="0">
       <td class="table-rank">${rank+1}</td>
       <td><span class="table-player">${s.name}</span><span class="table-player-sub">${s.team||'Team not set'}</span></td>
-      <td class="table-number" style="color:var(--green)">${s.wins}</td>
+      <td class="table-number" style="color:var(--gold)">${s.wins}</td>
       <td class="table-number" style="color:var(--red)">${s.losses}</td>
       <td class="table-number">${s.played}</td>
-      <td class="table-number" style="color:${s.gd>=0?'var(--green)':'var(--red)'}">${s.gd>=0?'+':''}${s.gd}</td>
+      <td class="table-number">${s.gd>=0?'+':''}${s.gd}</td>
+      <td class="table-number">${s.twoVTwoSeriesWins}</td>
       <td class="table-points">${s.pts}</td>
     </tr>`).join('');
   tbody.querySelectorAll('[data-profile-idx]').forEach(row=>{
